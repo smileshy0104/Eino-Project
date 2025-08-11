@@ -46,6 +46,7 @@ func main() {
 	}
 
 	// 处理回复
+	println("--- 标准生成 ---")
 	println(response.Content)
 
 	// 获取 Token 使用情况
@@ -54,4 +55,22 @@ func main() {
 		println("生成 Tokens:", usage.CompletionTokens)
 		println("总 Tokens:", usage.TotalTokens)
 	}
+
+	println("\n--- 流式生成 ---")
+	// 流式生成回复
+	stream, err := model.Stream(ctx, messages)
+	if err != nil {
+		panic(err)
+	}
+	defer stream.Close()
+
+	for {
+		chunk, err := stream.Recv()
+		if err != nil {
+			// 在流结束后会返回 io.EOF
+			break
+		}
+		print(chunk.Content)
+	}
+	println()
 }
