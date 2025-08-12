@@ -131,7 +131,7 @@ func main() {
 	// --- 统一的配置加载 ---
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".") // 确保在项目根目录运行
+	viper.AddConfigPath("./") // 确保在项目根目录运行
 	err := viper.ReadInConfig()
 	if err != nil {
 		panic(fmt.Errorf("fatal error config file: %w", err))
