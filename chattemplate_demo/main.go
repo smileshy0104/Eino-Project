@@ -94,6 +94,54 @@ func runTemplateChatWithChain() {
 	fmt.Println(finalAnswer.Content)
 }
 
+// =============================================================================
+//
+//  文件: simple_format_example.go
+//  功能: 演示如何直接使用 ChatTemplate 的 Format 方法。
+//
+// =============================================================================
+
+// runSimpleFormatExample 展示了 ChatTemplate 的基础用法。
+// 这个函数不调用任何大模型，它只负责将模板和变量转换成最终的消息列表。
+func runSimpleFormatExample() {
+	ctx := context.Background()
+
+	// --- 1. 定义聊天模板 ---
+	// 模板包含一个系统消息、历史消息占位符和用户消息。
+	template := prompt.FromMessages(schema.FString,
+		schema.SystemMessage("你是一个{role}。"),
+		schema.MessagesPlaceholder("history_key", false),
+		schema.UserMessage("我的任务是：{task}。"),
+	)
+
+	// --- 2. 准备变量 ---
+	// 这些变量将用于填充模板中的 {role}, {task}, 和 history_key 占位符。
+	variables := map[string]any{
+		"role": "专业的翻译家",
+		"task": "将下面的句子翻译成英文：'海内存知己，天涯若比邻。'",
+		"history_key": []*schema.Message{
+			{Role: schema.User, Content: "你好"},
+			{Role: schema.Assistant, Content: "你好！有什么可以帮助你的吗？"},
+		},
+	}
+
+	// --- 3. 调用 Format 方法 ---
+	// 这是本示例的核心。我们直接调用 template.Format 来获取格式化后的消息。
+	// 这个过程不涉及任何网络请求或 AI 计算。
+	formattedMessages, err := template.Format(ctx, variables)
+	if err != nil {
+		log.Fatalf("格式化模板失败: %v", err)
+	}
+
+	// --- 4. 打印结果 ---
+	// 打印出生成的消息列表，以验证格式化是否成功。
+	fmt.Println("\n--- 直接使用 Format 方法的结果 ---")
+	for _, msg := range formattedMessages {
+		fmt.Printf("角色: %s, 内容: %s\n", msg.Role, msg.Content)
+	}
+	fmt.Println("--- 示例结束 ---")
+}
+
 // main 是程序的入口。
 func main() {
 	// --- 统一的配置加载 ---
@@ -104,5 +152,8 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("fatal error config file: %w", err))
 	}
-	runTemplateChatWithChain()
+	// runTemplateChatWithChain()
+
+	// 调用直接使用 Format 的示例
+	runSimpleFormatExample()
 }
