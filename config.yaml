@@ -1,2 +1,3 @@
 ARK_API_KEY : "d0666bb8-8a41-42f4-bd06-94ca6ba08457"
 ARK_MODEL : "doubao-seed-1-6-250615"
+EMBEDDER_MODEL : "doubao-embedding-text-240715"

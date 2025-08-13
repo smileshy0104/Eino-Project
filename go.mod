@@ -12,6 +12,7 @@ require (
 	github.com/bytedance/sonic v1.13.2 // indirect
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
+	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/getkin/kin-openapi v0.118.0 // indirect
@@ -54,6 +55,7 @@ require (
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/arch v0.11.0 // indirect
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // indirect
+	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
