@@ -76,6 +76,7 @@ func runEmbeddingExample() {
 	if err != nil {
 		log.Fatalf("EmbedStrings 调用失败: %v", err)
 	}
+	fmt.Println("向量结果:", vectors)
 	fmt.Println("向量转换完成！")
 
 	// --- 4. 计算并打印相似度 ---
