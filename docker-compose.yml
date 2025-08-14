@@ -8,7 +8,7 @@ services:
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
       - ETCD_SNAPSHOT_COUNT=50000
     volumes:
-      - ./volumes/etcd:/etcd
+      - /Users/yuyansong/AiProject/Milvus-Config/etcd:/etcd
     command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
       test: ['CMD', 'etcdctl', 'endpoint', 'health']
@@ -26,7 +26,7 @@ services:
       - '9001:9001'
       - '9000:9000'
     volumes:
-      - ./volumes/minio:/minio_data
+      - /Users/yuyansong/AiProject/Milvus-Config/minio:/minio_data
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
@@ -42,7 +42,7 @@ services:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
     volumes:
-      - ./volumes/milvus:/var/lib/milvus
+      - /Users/yuyansong/AiProject/Milvus-Config/milvus:/var/lib/milvus
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:9091/healthz']
       interval: 30s
