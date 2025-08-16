@@ -7,6 +7,8 @@ require (
 	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.0
 	github.com/cloudwego/eino-ext/components/indexer/milvus v0.0.0-20250814083140-54b99ff82f8e
 	github.com/cloudwego/eino-ext/components/model/ark v0.1.19
+	github.com/cloudwego/eino-ext/components/retriever/milvus v0.0.0-20250814083140-54b99ff82f8e
+	github.com/cloudwego/eino-ext/components/retriever/volc_vikingdb v0.0.0-20250814083140-54b99ff82f8e
 	github.com/milvus-io/milvus-sdk-go/v2 v2.4.2
 	github.com/spf13/viper v1.20.1
 )
