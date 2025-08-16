@@ -107,6 +107,8 @@ github.com/cloudwego/base64x v0.1.5 h1:XPciSp1xaq2VCSt6lF0phncD4koWyULpl5bUxbfCy
 github.com/cloudwego/base64x v0.1.5/go.mod h1:0zlkT4Wn5C6NdauXdJRhSKRlJvmclQ1hhJgA0rcu/8w=
 github.com/cloudwego/eino v0.4.3 h1:ihHVHPMA8G2DPWeN+NTuIKr1QBAet9g84buH+LUl1bU=
 github.com/cloudwego/eino v0.4.3/go.mod h1:wUjz990apdsaOraOXdh6CdhVXq8DJsOvLsVlxNTcNfY=
+github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown v0.0.0-20250814083140-54b99ff82f8e h1:ezCRAbPerlhEgMiYJYrTZdgUZBtJz+H6cPiVtUS0oe8=
+github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown v0.0.0-20250814083140-54b99ff82f8e/go.mod h1:HZNxjGsgkN+1jsXdcKR8TwnE7J3W5C8aqX/hwWyAOoU=
 github.com/cloudwego/eino-ext/components/embedding/ark v0.1.0 h1:AuJsMdaTXc+dGUDQp82MifLYK8oiJf4gLQPUETmKISM=
 github.com/cloudwego/eino-ext/components/embedding/ark v0.1.0/go.mod h1:0FZG/KRBl3hGWkNsm55UaXyVa6PDVIy5u+QvboAB+cY=
 github.com/cloudwego/eino-ext/components/indexer/milvus v0.0.0-20250814083140-54b99ff82f8e h1:MkyoDps+DEY+Yj734Kbc1btrGF46llF6ld4a3k6DZB0=
@@ -115,8 +117,6 @@ github.com/cloudwego/eino-ext/components/model/ark v0.1.19 h1:XYnOeszXA28T1gxYOp
 github.com/cloudwego/eino-ext/components/model/ark v0.1.19/go.mod h1:VZ7Sa1ocNiSZFiNgg1PQXYdnCJAzPy4Dxt/Ctuwlfp8=
 github.com/cloudwego/eino-ext/components/retriever/milvus v0.0.0-20250814083140-54b99ff82f8e h1:FSMCFA/zidJ4SyOC3/p+ly5vND8PtNHvmQX+SudkfJk=
 github.com/cloudwego/eino-ext/components/retriever/milvus v0.0.0-20250814083140-54b99ff82f8e/go.mod h1:PYh8yoOcuFYVfSZZ4vglaeRgaXrMz5D4uKioDZxEDA0=
-github.com/cloudwego/eino-ext/components/retriever/volc_vikingdb v0.0.0-20250814083140-54b99ff82f8e h1:JBjHJGYpQcaPKlbFhmFFs3AYkE/NKxsQr6hXzSE4KH4=
-github.com/cloudwego/eino-ext/components/retriever/volc_vikingdb v0.0.0-20250814083140-54b99ff82f8e/go.mod h1:6GttY/Lfmm5rt5ErfHZOXCA+hHVaCCvpVz2QKoxJKiY=
 github.com/cloudwego/iasm v0.2.0/go.mod h1:8rXZaNYT2n95jn+zTI1sDr+IgcD2GVs0nlbbQPiEFhY=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
