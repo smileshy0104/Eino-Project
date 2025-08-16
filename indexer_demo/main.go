@@ -89,6 +89,33 @@ func runIndexerExample() {
 		log.Fatalf("创建 Milvus 客户端失败: %v", err)
 	}
 
+	has, err := client.HasCollection(ctx, collectionName)
+	if err != nil {
+		log.Fatalf("检查集合是否存在失败: %v", err)
+	}
+	if !has {
+		fmt.Printf("集合 '%s' 不存在，正在创建...\n", collectionName)
+		schema := &entity.Schema{CollectionName: collectionName, Fields: fields}
+		err = client.CreateCollection(ctx, schema, entity.DefaultShardNumber)
+		if err != nil {
+			log.Fatalf("创建集合失败: %v", err)
+		}
+		fmt.Println("集合创建成功！")
+
+		fmt.Println("正在为 'vector' 字段创建 BIN_FLAT 索引...")
+		binFlatIndex, err := entity.NewIndexBinFlat(entity.HAMMING, 128)
+		if err != nil {
+			log.Fatalf("创建 BIN_FLAT 索引对象失败: %v", err)
+		}
+		err = client.CreateIndex(ctx, collectionName, "vector", binFlatIndex, false)
+		if err != nil {
+			log.Fatalf("为 'vector' 字段创建索引失败: %v", err)
+		}
+		fmt.Println("BIN_FLAT 索引创建成功！")
+	} else {
+		fmt.Printf("集合 '%s' 已存在，跳过创建步骤。\n", collectionName)
+	}
+
 	// 根据文档，创建一个 milvus.IndexerConfig。
 	// 这个配置对象将 Milvus 客户端、集合名称、Embedder 和集合模式关联起来。
 	cfg := &milvus.IndexerConfig{
