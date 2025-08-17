@@ -36,7 +36,7 @@ Eino 提供了多种分割策略，例如：
 
 ## 3. 使用示例：Markdown Header Splitter
 
-[`transformer_demo/main.go`](transformer_demo/main.go) 文件中的代码演示了如何使用 `Markdown Header Splitter`。
+[`transformer_demo/main.go`](transformer_demo/main.go) 文件中的代码演示了如何独立使用 `Markdown Header Splitter`。
 
 ### 步骤 1: 准备原始文档
 
@@ -84,19 +84,23 @@ docsToStore, err := splitter.Transform(ctx, []*schema.Document{longMarkdownDoc})
 转换完成后，`docsToStore` 将是一个包含多个 `*schema.Document` 的列表。原始文档被成功地按二级标题分割成了多个独立的块，每个块都保留了原始的元数据，并拥有一个新的、唯一的 ID。
 
 ```
---- Transformer 分割完成，原始文档被分割成 3 个块 ---
-  块 1 ID: eino-intro-doc_0, 内容预览: ## 核心组件
+--- 分割完成，共得到 3 个新文档 ---
+
+--- 文档块 1 ---
+ID: eino-intro-doc_0
+内容:
+## 核心组件
 Eino 提供了多种核心组件...
-  块 2 ID: eino-intro-doc_1, 内容预览: ## Transformer 详解
-Transformer ...
-  块 3 ID: eino-intro-doc_2, 内容预览: ## 快速开始
-要开始使用 Eino，请...
+元数据: map[Header 2:核心组件 source:official-docs]
+
+--- 文档块 2 ---
+...
 ```
 
 ## 4. 如何运行
 
-本示例已包含在 `transformer_demo/main.go` 的端到端流水线中。您可以直接运行该文件来查看 `Transformer` 组件在整个流程中的实际效果。
-
+直接在项目根目录下执行以下命令：
 ```bash
-# 确保 config.yaml 配置正确
 go run transformer_demo/main.go
+```
+程序将打印出原始文档信息，以及分割后的每一个文档块的详细内容。

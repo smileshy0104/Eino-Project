@@ -4,115 +4,78 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"regexp"
 	"strings"
 
-	"github.com/cloudwego/eino/components/document"
+	"github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown"
 	"github.com/cloudwego/eino/schema"
 )
 
-// --- 自定义 Option ---
-
-// SentenceSplitterOptions 定义了我们自定义 Transformer 的特定选项。
-type SentenceSplitterOptions struct {
-	MinSentenceLength int // 句子的最小长度，低于此长度的句子将被忽略
-}
-
-// WithMinSentenceLength 是一个 Option 函数，用于设置最小句子长度。
-// 它遵循文档中描述的自定义 Option 实现模式。
-func WithMinSentenceLength(length int) document.TransformerOption {
-	// WrapTransformerImplSpecificOptFn 用于将特定于实现的 Option 函数包装成通用的 TransformerOption 类型。
-	return document.WrapTransformerImplSpecificOptFn(func(o *SentenceSplitterOptions) {
-		o.MinSentenceLength = length
-	})
-}
-
-// --- 自定义 Transformer ---
-
-// SentenceSplitter 是一个自定义的 Transformer，它按句子分割文档。
-type SentenceSplitter struct {
-	defaultMinSentenceLength int
-}
-
-// NewSentenceSplitter 创建一个新的 SentenceSplitter 实例。
-func NewSentenceSplitter() *SentenceSplitter {
-	return &SentenceSplitter{
-		defaultMinSentenceLength: 5, // 默认句子的最小长度为5个字符
-	}
-}
-
-// Transform 实现了 Transformer 接口的核心方法。
-func (s *SentenceSplitter) Transform(ctx context.Context, src []*schema.Document, opts ...document.TransformerOption) ([]*schema.Document, error) {
-	// 1. 处理自定义 Option
-	options := &SentenceSplitterOptions{
-		MinSentenceLength: s.defaultMinSentenceLength,
-	}
-	// GetTransformerImplSpecificOptions 是一个辅助函数，用于解析用户传入的 opts 并更新 options 结构体。
-	document.GetTransformerImplSpecificOptions(options, opts...)
-
-	log.Printf("开始转换文档，最小句子长度: %d\n", options.MinSentenceLength)
-
-	var transformedDocs []*schema.Document
-	// 使用正则表达式按句末标点符号分割句子
-	re := regexp.MustCompile(`[.!?]`)
-
-	for _, doc := range src {
-		sentences := re.Split(doc.Content, -1)
-		for i, sentence := range sentences {
-			// 去除首尾空格
-			trimmedSentence := strings.TrimSpace(sentence)
-			// 应用最小长度过滤
-			if len(trimmedSentence) >= options.MinSentenceLength {
-				newDoc := &schema.Document{
-					ID:      fmt.Sprintf("%s-part%d", doc.ID, i),
-					Content: trimmedSentence,
-					MetaData: map[string]interface{}{
-						"original_doc_id": doc.ID,
-						"part_num":        i,
-					},
-				}
-				transformedDocs = append(transformedDocs, newDoc)
-			}
-		}
-	}
-
-	return transformedDocs, nil
-}
+// =============================================================================
+//
+//  文件: transformer_demo/main.go
+//  功能: 演示如何独立使用 Document Transformer 组件，特别是 Markdown Header Splitter，
+//        来将一个长文档按标题分割成多个小文档。
+//
+// =============================================================================
 
 func main() {
 	ctx := context.Background()
 
-	// 1. 初始化我们自定义的 Transformer
-	splitter := NewSentenceSplitter()
-	fmt.Println("自定义 Transformer (SentenceSplitter) 初始化成功。")
+	// --- 步骤 1: 准备一个包含 Markdown 标题的示例文档 ---
+	// 这个文档包含了多个二级标题 (##)，我们将根据这些标题进行分割。
+	markdownContent := `
+# Eino 框架介绍
 
-	// 2. 准备一个待转换的文档
-	originalDoc := &schema.Document{
-		ID:      "news-article-01",
-		Content: "Eino is a framework. It simplifies building LLM apps. Try it. It's great!",
+Eino 是一个先进的大模型应用开发框架。
+
+## 核心组件
+Eino 提供了多种核心组件，包括 Model, Retriever, Indexer, 和 Transformer。
+这些组件可以帮助开发者快速构建强大的 RAG 应用。
+
+## Transformer 详解
+Transformer 组件负责文档的预处理。
+它可以将长文档分割成小块，过滤无关信息，或进行格式转换。
+这是确保检索质量的关键一步。
+
+## 快速开始
+要开始使用 Eino，请参考我们的官方文档和示例代码。
+`
+	doc := &schema.Document{
+		ID:       "eino-intro-doc",
+		Content:  markdownContent,
+		MetaData: map[string]interface{}{"source": "official-docs"},
 	}
+	fmt.Println("--- 原始文档 ---")
+	fmt.Printf("ID: %s\n内容长度: %d\n", doc.ID, len(doc.Content))
+	fmt.Println(strings.Repeat("-", 20))
 
-	// 3. 执行第一次转换 (使用默认的最小句子长度)
-	fmt.Println("\n--- 第一次转换 (使用默认最小句子长度) ---")
-	docs, err := splitter.Transform(ctx, []*schema.Document{originalDoc})
+	// --- 步骤 2: 初始化 Markdown Header Splitter ---
+	// 我们配置 splitter，让它根据二级标题 "##" 来分割文档。
+	// Headers map 的 value 可以用来给分割后的文档的 metadata 添加额外信息。
+	// 例如，{"##": "h2_title"} 会在分割出的文档块的 metadata 中添加 {"h2_title": "核心组件"} 这样的键值对。
+	splitter, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderConfig{
+		Headers: map[string]string{
+			"##": "Header 2",
+		},
+	})
 	if err != nil {
-		log.Fatalf("转换失败: %v", err)
+		log.Fatalf("创建 HeaderSplitter 失败: %v", err)
 	}
 
-	fmt.Printf("转换后得到 %d 个文档:\n", len(docs))
-	for _, doc := range docs {
-		fmt.Printf("  - ID: %s, 内容: '%s'\n", doc.ID, doc.Content)
-	}
-
-	// 4. 再次执行转换，但这次使用 Option 来设置一个更大的最小句子长度
-	fmt.Println("\n--- 第二次转换 (使用 WithMinSentenceLength(10) 选项) ---")
-	docs, err = splitter.Transform(ctx, []*schema.Document{originalDoc}, WithMinSentenceLength(10))
+	// --- 步骤 3: 调用 Transform 方法进行分割 ---
+	fmt.Println("\n正在调用 Transform 方法进行分割...")
+	transformedDocs, err := splitter.Transform(ctx, []*schema.Document{doc})
 	if err != nil {
-		log.Fatalf("转换失败: %v", err)
+		log.Fatalf("转换文档失败: %v", err)
 	}
 
-	fmt.Printf("转换后得到 %d 个文档:\n", len(docs))
-	for _, doc := range docs {
-		fmt.Printf("  - ID: %s, 内容: '%s'\n", doc.ID, doc.Content)
+	// --- 步骤 4: 打印分割后的结果 ---
+	fmt.Printf("\n--- 分割完成，共得到 %d 个新文档 ---\n", len(transformedDocs))
+	for i, d := range transformedDocs {
+		fmt.Printf("\n--- 文档块 %d ---\n", i+1)
+		fmt.Printf("ID: %s\n", d.ID)
+		fmt.Printf("内容:\n%s\n", d.Content)
+		fmt.Printf("元数据: %v\n", d.MetaData)
 	}
+	fmt.Println(strings.Repeat("-", 30))
 }
