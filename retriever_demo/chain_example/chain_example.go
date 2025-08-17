@@ -15,33 +15,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// createPromptFromDocs 是一个自定义的 Lambda 函数。
-func createPromptFromDocs(ctx context.Context, in map[string]any) (out []*schema.Message, err error) {
-	query, _ := in["query"].(string)
-	docs, _ := in["docs"].([]*schema.Document)
-
-	if len(docs) == 0 {
-		prompt := fmt.Sprintf("背景知识库中没有与“%s”相关的信息。请直接回答问题。", query)
-		messages := []*schema.Message{
-			schema.SystemMessage("你是一个知识渊博的问答助手。"),
-			schema.UserMessage(prompt),
-		}
-		return messages, nil
-	}
-
-	prompt := "请根据以下背景知识来回答问题。\n\n--- 背景知识 ---\n"
-	for i, doc := range docs {
-		prompt += fmt.Sprintf("[%d] %s\n", i+1, doc.Content)
-	}
-	prompt += fmt.Sprintf("\n--- 问题 ---\n%s", query)
-
-	messages := []*schema.Message{
-		schema.SystemMessage("你是一个严谨的问答助手，请严格根据提供的背景知识回答。如果知识不足，请说明情况。"),
-		schema.UserMessage(prompt),
-	}
-	return messages, nil
-}
-
 // Run 是此包的入口函数，用于执行 RAG Chain 示例。
 func Run() {
 	ctx := context.Background()
@@ -85,16 +58,50 @@ func Run() {
 	fmt.Println("所有 RAG 组件初始化成功！")
 
 	// --- 2. 构建并编排 Chain ---
+
+	// 关键修正：使用闭包来在 Chain 的不同节点间传递 query 状态。
+	var queryForPrompt string
+
+	// createPromptFromDocs 现在只接收 docs，并通过闭包获取 query。
+	createPromptFromDocs := func(ctx context.Context, docs []*schema.Document) (out []*schema.Message, err error) {
+		if len(docs) == 0 {
+			prompt := fmt.Sprintf("背景知识库中没有与“%s”相关的信息。请直接回答问题。", queryForPrompt)
+			messages := []*schema.Message{
+				schema.SystemMessage("你是一个知识渊博的问答助手。"),
+				schema.UserMessage(prompt),
+			}
+			return messages, nil
+		}
+
+		prompt := "请根据以下背景知识来回答问题。\n\n--- 背景知识 ---\n"
+		for i, doc := range docs {
+			prompt += fmt.Sprintf("[%d] %s\n", i+1, doc.Content)
+		}
+		prompt += fmt.Sprintf("\n--- 问题 ---\n%s", queryForPrompt)
+
+		messages := []*schema.Message{
+			schema.SystemMessage("你是一个严谨的问答助手，请严格根据提供的背景知识回答。如果知识不足，请说明情况。"),
+			schema.UserMessage(prompt),
+		}
+		return messages, nil
+	}
+
 	chain := compose.NewChain[string, *schema.Message]()
 
+	// 步骤 1: 捕获 query 并将其存入闭包变量，同时准备好 Retriever 的输入。
 	chain.AppendLambda(
 		compose.InvokableLambda(func(ctx context.Context, query string) (map[string]any, error) {
+			queryForPrompt = query // 存入闭包
 			return map[string]any{"query": query}, nil
 		}),
 	)
 
-	chain.AppendRetriever(retriever, compose.WithInputKey("query"), compose.WithOutputKey("docs"))
+	// 步骤 2: Retriever 节点。它的输出 (docs) 将会覆盖上一步的 map，成为下一步的输入。
+	chain.AppendRetriever(retriever, compose.WithInputKey("query"))
+
+	// 步骤 3: Prompt 构建节点。它接收上一步的输出 (docs)，并使用闭包中的 queryForPrompt。
 	chain.AppendLambda(compose.InvokableLambda(createPromptFromDocs))
+
 	chain.AppendChatModel(model)
 
 	// --- 3. 编译并运行 Chain ---
@@ -103,7 +110,7 @@ func Run() {
 		log.Fatalf("编译 Chain 失败: %v", err)
 	}
 
-	query := "Eino 是什么？"
+	query := "Eino 框架是什么？"
 	fmt.Printf("\n--- 开始运行 RAG Chain, 查询: \"%s\" ---\n", query)
 	finalAnswer, err := runnable.Invoke(ctx, query)
 	if err != nil {
