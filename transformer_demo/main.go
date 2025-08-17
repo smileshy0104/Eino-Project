@@ -1,3 +1,5 @@
+// Package main 提供了 Eino 框架中 Transformer、Indexer 和 Retriever 组件的演示。
+// 这个示例展示了如何将一个长文档进行分割、向量化、索引，并最终根据查询检索出相关文档块的完整流程。
 package main
 
 import (
@@ -6,17 +8,28 @@ import (
 	"log"
 	"time"
 
+	// Eino 框架的文档转换器组件，用于分割 Markdown 文档
 	"github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown"
+	// Eino 框架的 embedding 组件，这里使用火山方舟作为 embedding 服务
 	embedder "github.com/cloudwego/eino-ext/components/embedding/ark"
+	// Eino 框架的 indexer 组件，用于将文档存入 Milvus 向量数据库
 	"github.com/cloudwego/eino-ext/components/indexer/milvus"
+	// Eino 框架的 retriever 组件，用于从 Milvus 向量数据库中检索文档
 	retriever "github.com/cloudwego/eino-ext/components/retriever/milvus"
+	// Eino 框架的核心 embedding 接口定义
 	"github.com/cloudwego/eino/components/embedding"
+	// Eino 框架的核心数据结构定义
 	"github.com/cloudwego/eino/schema"
+	// Milvus Go SDK 客户端
 	cli "github.com/milvus-io/milvus-sdk-go/v2/client"
+	// Milvus Go SDK 实体定义
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
+	// Viper 用于管理配置
 	"github.com/spf13/viper"
 )
 
+// milvusSchema 定义了 Milvus 集合的结构。
+// 包含 id, vector, content, 和 metadata 四个字段。
 var milvusSchema = []*entity.Field{
 	{
 		Name:        "id",
@@ -28,7 +41,7 @@ var milvusSchema = []*entity.Field{
 	{
 		Name:        "vector",
 		DataType:    entity.FieldTypeBinaryVector,
-		TypeParams:  map[string]string{"dim": "81920"},
+		TypeParams:  map[string]string{"dim": "81920"}, // 维度需与 embedding 模型匹配
 		Description: "文档内容的向量表示",
 	},
 	{
@@ -44,17 +57,20 @@ var milvusSchema = []*entity.Field{
 	},
 }
 
+// loadConfig 从配置文件 (config.yaml) 或环境变量中加载配置。
 func loadConfig() {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("./")
-	viper.AddConfigPath("../")
-	viper.AutomaticEnv()
+	viper.AddConfigPath("./")  // 在当前目录查找
+	viper.AddConfigPath("../") // 在上一级目录查找
+	viper.AutomaticEnv()       // 允许从环境变量读取
 	if err := viper.ReadInConfig(); err != nil {
+		// 如果找不到配置文件，打印提示信息，程序将依赖环境变量
 		fmt.Println("未找到 config.yaml 文件，将仅从环境变量读取配置。")
 	}
 }
 
+// prepareDocument 创建一个用于演示的原始 schema.Document 对象。
 func prepareDocument() *schema.Document {
 	fmt.Println("--- 步骤 1: 准备原始长文档 ---")
 	return &schema.Document{
@@ -72,14 +88,18 @@ Transformer 组件负责文档的预处理。它可以将长文档分割成小�
 	}
 }
 
+// splitDocument 使用 Markdown HeaderSplitter 将单个文档分割成多个小块。
 func splitDocument(ctx context.Context, doc *schema.Document) []*schema.Document {
 	fmt.Println("\n--- 步骤 2: 使用 Transformer 分割文档 ---")
+	// 基于 Markdown 的二级标题 "##" 进行分割
 	splitter, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderConfig{
 		Headers: map[string]string{"##": "Header 2"},
 	})
 	if err != nil {
 		log.Fatalf("创建 HeaderSplitter 失败: %v", err)
 	}
+
+	// 执行分割操作
 	chunks, err := splitter.Transform(ctx, []*schema.Document{doc})
 	if err != nil {
 		log.Fatalf("转换文档失败: %v", err)
@@ -88,16 +108,21 @@ func splitDocument(ctx context.Context, doc *schema.Document) []*schema.Document
 	return chunks
 }
 
+// setupMilvus 初始化 Milvus 客户端，创建集合和索引（如果不存在），并使用 Indexer 组件将文档块存入 Milvus。
 func setupMilvus(ctx context.Context, collectionName string, embedder *embedder.Embedder, chunkDocs []*schema.Document) cli.Client {
-	fmt.Printf("\n--- 步骤 3: 设置 Milvus (集合: %s) ---\n", collectionName)
+	fmt.Printf("\n--- 步骤 3 & 4: 设置 Milvus 并索引文档 (集合: %s) ---\n", collectionName)
 	address := viper.GetString("MILVUS_ADDRESS")
 	if address == "" || collectionName == "" {
-		log.Fatal("Milvus 配置 (Address, Collection) 必须被设置！")
+		log.Fatal("Milvus 配置 (MILVUS_ADDRESS, MILVUS_COLLECTION) 必须被设置！")
 	}
+
+	// 1. 连接 Milvus
 	client, err := cli.NewClient(ctx, cli.Config{Address: address})
 	if err != nil {
 		log.Fatalf("创建 Milvus 客户端失败: %v", err)
 	}
+
+	// 2. 检查集合是否存在，如果不存在则创建
 	has, err := client.HasCollection(ctx, collectionName)
 	if err != nil {
 		log.Fatalf("检查集合是否存在失败: %v", err)
@@ -111,7 +136,9 @@ func setupMilvus(ctx context.Context, collectionName string, embedder *embedder.
 		}
 		fmt.Println("集合创建成功！")
 
+		// 3. 为 vector 字段创建索引
 		fmt.Println("正在为 'vector' 字段创建 BIN_FLAT 索引...")
+		// 注意：这里的参数需要根据 embedding 模型的特性来选择
 		binFlatIndex, err := entity.NewIndexBinFlat(entity.HAMMING, 128)
 		if err != nil {
 			log.Fatalf("创建 BIN_FLAT 索引对象失败: %v", err)
@@ -125,27 +152,26 @@ func setupMilvus(ctx context.Context, collectionName string, embedder *embedder.
 		fmt.Printf("集合 '%s' 已存在，跳过创建步骤。\n", collectionName)
 	}
 
-	cfg := &milvus.IndexerConfig{
+	// 4. 初始化 Indexer 并存储文档
+	indexerCfg := &milvus.IndexerConfig{
 		Client:     client,
 		Collection: collectionName,
 		Embedding:  embedder,
 		Fields:     milvusSchema,
 	}
-	indexer, err := milvus.NewIndexer(ctx, cfg)
+	indexer, err := milvus.NewIndexer(ctx, indexerCfg)
 	if err != nil {
 		log.Fatalf("创建 Indexer 失败: %v", err)
 	}
 	fmt.Println("Indexer 初始化成功！")
 
-	docsToStore := chunkDocs
-
-	fmt.Println("\n准备存储以下文档:")
-	for _, doc := range docsToStore {
+	fmt.Println("\n准备存储以下文档块:")
+	for _, doc := range chunkDocs {
 		fmt.Printf("  - ID: %s\n", doc.ID)
 	}
 
-	fmt.Println("\n正在调用 Store 方法...")
-	storedIDs, err := indexer.Store(ctx, docsToStore)
+	fmt.Println("\n正在调用 Store 方法将文档存入 Milvus...")
+	storedIDs, err := indexer.Store(ctx, chunkDocs)
 	if err != nil {
 		log.Fatalf("存储文档失败: %v", err)
 	}
@@ -156,39 +182,49 @@ func setupMilvus(ctx context.Context, collectionName string, embedder *embedder.
 	return client
 }
 
+// retrieveChunks 使用 Retriever 组件从 Milvus 中检索与查询相关的文档块。
 func retrieveChunks(ctx context.Context, client cli.Client, embedderComponent embedding.Embedder, collectionName string, query string) {
 	fmt.Println("\n--- 步骤 5: 检索文档块 ---")
+	// 初始化 Retriever
 	retrieverCfg := &retriever.RetrieverConfig{
-		Client: client, Collection: collectionName, Embedding: embedderComponent, OutputFields: []string{"content", "metadata"},
+		Client:       client,
+		Collection:   collectionName,
+		Embedding:    embedderComponent,
+		OutputFields: []string{"content", "metadata"}, // 指定检索时需要返回的字段
 	}
 	retrieverComponent, err := retriever.NewRetriever(ctx, retrieverCfg)
 	if err != nil {
 		log.Fatalf("创建 Retriever 失败: %v", err)
 	}
 
+	// 执行检索
 	fmt.Printf("正在使用查询: \"%s\"\n", query)
 	retrievedDocs, err := retrieverComponent.Retrieve(ctx, query)
 	if err != nil {
 		log.Fatalf("检索文档失败: %v", err)
 	}
 
+	// 打印检索结果
 	fmt.Println("\n--- 检索成功 ---")
 	if len(retrievedDocs) == 0 {
 		fmt.Println("未检索到相关文档。")
 	} else {
 		fmt.Printf("检索到 %d 个最相关的文档块:\n", len(retrievedDocs))
-		for _, doc := range retrievedDocs {
-			fmt.Printf("  - ID: %s\n", doc.ID)
-			fmt.Printf("    内容: %s\n", doc.Content)
-			fmt.Printf("    元数据: %v\n", doc.MetaData)
+		for i, doc := range retrievedDocs {
+			fmt.Printf("  - [%d] ID: %s\n", i+1, doc.ID)
+			fmt.Printf("      内容: %s\n", doc.Content)
+			fmt.Printf("      元数据: %v\n", doc.MetaData)
 		}
 	}
 }
 
+// main 是程序的入口点，协调整个 RAG 流程。
 func main() {
+	// 加载配置
 	loadConfig()
 	ctx := context.Background()
 
+	// 初始化 embedding 组件
 	timeout := 30 * time.Second
 	embedderComponent, err := embedder.NewEmbedder(ctx, &embedder.EmbeddingConfig{
 		APIKey:  viper.GetString("ARK_API_KEY"),
@@ -200,9 +236,14 @@ func main() {
 	}
 	collectionName := viper.GetString("MILVUS_COLLECTION")
 
+	// 完整的 RAG 流程
+	// 1. 准备文档
 	originalDoc := prepareDocument()
+	// 2. 分割文档
 	chunks := splitDocument(ctx, originalDoc)
+	// 3. & 4. 设置 Milvus 并索引文档
 	fmt.Println("正在索引文档...")
 	client := setupMilvus(ctx, collectionName, embedderComponent, chunks)
+	// 5. 检索文档
 	retrieveChunks(ctx, client, embedderComponent, collectionName, "Transformer 是做什么的？")
 }
