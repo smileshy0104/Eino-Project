@@ -50,7 +50,7 @@ var fields = []*entity.Field{
 		// 关键设定 (2): 向量的维度。
 		// 必须与 embedding 模型输出的向量维度完全一致。
 		// 例如，某些模型的二进制向量维度是 8192 (1024 * 8)。请根据您使用的模型进行精确设置。
-		TypeParams:  map[string]string{"dim": "8192"},
+		TypeParams:  map[string]string{"dim": "81920"},
 		Description: "文档内容的向量表示",
 	},
 	{
@@ -148,16 +148,21 @@ func runIndexerExample() {
 
 	// --- 步骤 3: 准备待存储的文档 ---
 	doc1 := &schema.Document{
-		ID:       "eino-doc-001",
+		ID:       "1",
 		Content:  "Eino 是一个云原生的大模型应用开发框架，旨在简化和加速大模型应用的构建。",
 		MetaData: map[string]interface{}{"source": "official_docs", "author": "CloudWeGo"},
 	}
 	doc2 := &schema.Document{
-		ID:       "eino-doc-002",
+		ID:       "2",
 		Content:  "RAG (Retrieval-Augmented Generation) 是一种结合了检索和生成两大功能的AI技术。",
 		MetaData: map[string]interface{}{"source": "tech_blog", "author": "AI_Researcher"},
 	}
-	docsToStore := []*schema.Document{doc1, doc2}
+	doc3 := &schema.Document{
+		ID:       "3",
+		Content:  "Go语言微服务架构和gRPC框架的核心内容。",
+		MetaData: map[string]interface{}{"source": "Aiyer0104_blog", "author": "yyds"},
+	}
+	docsToStore := []*schema.Document{doc1, doc2, doc3}
 
 	// --- 步骤 4: 调用 Store 方法进行存储 ---
 	// Store 方法是 Indexer 的核心，它会自动处理以下流程：

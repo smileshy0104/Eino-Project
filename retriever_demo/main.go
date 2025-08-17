@@ -53,8 +53,10 @@ func runRetrieverExample() {
 	cfg := &milvus.RetrieverConfig{
 		Client:       client,
 		Collection:   collectionName,
+		VectorField:  "vector",
 		Embedding:    embedder,
-		OutputFields: []string{"content", "metadata"},
+		OutputFields: []string{"id", "content", "metadata"},
+		TopK:         2,
 	}
 	retriever, err := milvus.NewRetriever(ctx, cfg)
 	if err != nil {
