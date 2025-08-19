@@ -3,7 +3,7 @@ module Eini
 go 1.24.2
 
 require (
-	github.com/cloudwego/eino v0.4.3
+	github.com/cloudwego/eino v0.4.4
 	github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown v0.0.0-20250814083140-54b99ff82f8e
 	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.0
 	github.com/cloudwego/eino-ext/components/indexer/milvus v0.0.0-20250814083140-54b99ff82f8e

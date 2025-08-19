@@ -1,0 +1,22 @@
+## Claude Code 问题记录
+
+时间: 2025-08-19
+
+1. 你是谁
+2. 解释以上这些设置  
+3. 执行claude config set hasCompletedProjectOnboarding 会报error: missing required argument 'value'
+4. 我需要设置这几个
+5. Create a file called test.txt with 'Hello World'
+6. 将其改造成go文件，输出hello，world
+7. 如何设置成claude自动通过
+8. 创建个hello.go,输出hello world
+9. 带初始提示的 REPL 有什么用处
+10. 启动交互式 REPL 呢
+11. 我希望你把我每次问你的问题都会自动存储在一个文件中
+12. 你知道eino嘛
+13. 我希望你读取当前项目的代码
+14. 如果我给你个网站你可以读取其中的内容吗
+15. https://www.cloudwego.io/zh/docs/eino/core_modules/components/tools_node_guide/ 这里面存着eino关于tool的内容
+16. https://www.cloudwego.io/zh/docs/eino/core_modules/components/tools_node_guide/how_to_create_a_tool/还有这个
+17. 我希望你根据文档，写几个tool的demo例子，方便我理解tool的使用
+18. 目前这些列子都无法正常运行
