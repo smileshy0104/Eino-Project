@@ -54,18 +54,18 @@ type WeatherTool struct{}
 // Info 返回天气工具的元信息和参数定义
 func (w *WeatherTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "get_weather",                      // 工具名称，用于工具调用时的标识
-		Desc: "查询指定城市的天气信息",              // 工具描述，帮助 LLM 理解工具功能
+		Name: "get_weather", // 工具名称，用于工具调用时的标识
+		Desc: "查询指定城市的天气信息", // 工具描述，帮助 LLM 理解工具功能
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"city": {
-				Type:     "string", 
-				Desc:     "城市名称", 
-				Required: true,     // 必需参数
+				Type:     "string",
+				Desc:     "城市名称",
+				Required: true, // 必需参数
 			},
 			"date": {
-				Type:     "string", 
-				Desc:     "查询日期 (YYYY-MM-DD)", 
-				Required: false,    // 可选参数，不提供时默认为当天
+				Type:     "string",
+				Desc:     "查询日期 (YYYY-MM-DD)",
+				Required: false, // 可选参数，不提供时默认为当天
 			},
 		}),
 	}, nil
@@ -93,13 +93,13 @@ func (w *WeatherTool) InvokableRun(ctx context.Context, argumentsInJSON string, 
 
 	// 模拟天气数据生成（实际应用中这里会调用真实的天气 API）
 	weatherData := map[string]interface{}{
-		"city":        args.City,                                           // 城市名称
-		"date":        args.Date,                                           // 查询日期
-		"temperature": 25,                                                  // 温度（摄氏度）
-		"humidity":    60,                                                  // 湿度（百分比）
-		"condition":   "晴朗",                                               // 天气状况
-		"wind_speed":  "5 km/h",                                            // 风速
-		"description": fmt.Sprintf("%s 今天天气晴朗，温度适宜", args.City),      // 天气描述
+		"city":        args.City,                                // 城市名称
+		"date":        args.Date,                                // 查询日期
+		"temperature": 25,                                       // 温度（摄氏度）
+		"humidity":    60,                                       // 湿度（百分比）
+		"condition":   "晴朗",                                     // 天气状况
+		"wind_speed":  "5 km/h",                                 // 风速
+		"description": fmt.Sprintf("%s 今天天气晴朗，温度适宜", args.City), // 天气描述
 	}
 
 	// 将结果序列化为 JSON 字符串返回
@@ -115,13 +115,13 @@ type CalculatorTool struct{}
 // Info 返回计算器工具的元信息和参数定义
 func (c *CalculatorTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "calculator",         // 工具名称
-		Desc: "执行数学计算",        // 工具描述
+		Name: "calculator", // 工具名称
+		Desc: "执行数学计算",     // 工具描述
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"expression": {
-				Type:     "string", 
-				Desc:     "数学表达式", 
-				Required: true,     // 表达式是必需参数
+				Type:     "string",
+				Desc:     "数学表达式",
+				Required: true, // 表达式是必需参数
 			},
 		}),
 	}, nil
@@ -147,9 +147,9 @@ func (c *CalculatorTool) InvokableRun(ctx context.Context, argumentsInJSON strin
 
 	// 构造响应结果
 	response := map[string]interface{}{
-		"expression": args.Expression,                    // 原始表达式
-		"result":     result,                             // 计算结果
-		"timestamp":  time.Now().Format(time.RFC3339),   // 计算时间戳
+		"expression": args.Expression,                 // 原始表达式
+		"result":     result,                          // 计算结果
+		"timestamp":  time.Now().Format(time.RFC3339), // 计算时间戳
 	}
 
 	// 序列化结果并返回
@@ -165,23 +165,23 @@ type TranslatorTool struct{}
 // Info 返回翻译工具的元信息和参数定义
 func (t *TranslatorTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "translator",             // 工具名称
-		Desc: "翻译文本",               // 工具描述
+		Name: "translator", // 工具名称
+		Desc: "翻译文本",       // 工具描述
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"text": {
-				Type:     "string", 
-				Desc:     "要翻译的文本", 
-				Required: true,         // 必需参数
+				Type:     "string",
+				Desc:     "要翻译的文本",
+				Required: true, // 必需参数
 			},
 			"from_lang": {
-				Type:     "string", 
-				Desc:     "源语言", 
-				Required: false,        // 可选参数，不指定时自动检测
+				Type:     "string",
+				Desc:     "源语言",
+				Required: false, // 可选参数，不指定时自动检测
 			},
 			"to_lang": {
-				Type:     "string", 
-				Desc:     "目标语言", 
-				Required: true,         // 必需参数
+				Type:     "string",
+				Desc:     "目标语言",
+				Required: true, // 必需参数
 			},
 		}),
 	}, nil
@@ -213,11 +213,11 @@ func (t *TranslatorTool) InvokableRun(ctx context.Context, argumentsInJSON strin
 
 	// 构造翻译结果响应
 	response := map[string]interface{}{
-		"original_text":   args.Text,       // 原始文本
-		"translated_text": translatedText,  // 翻译后的文本
-		"from_language":   args.FromLang,   // 源语言
-		"to_language":     args.ToLang,     // 目标语言
-		"confidence":      0.95,            // 翻译置信度（模拟值）
+		"original_text":   args.Text,      // 原始文本
+		"translated_text": translatedText, // 翻译后的文本
+		"from_language":   args.FromLang,  // 源语言
+		"to_language":     args.ToLang,    // 目标语言
+		"confidence":      0.95,           // 翻译置信度（模拟值）
 	}
 
 	// 序列化结果并返回
@@ -233,8 +233,8 @@ type FileManagerTool struct{}
 // Info 返回文件管理工具的元信息和参数定义
 func (f *FileManagerTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "file_manager",           // 工具名称
-		Desc: "管理文件和目录",          // 工具描述
+		Name: "file_manager", // 工具名称
+		Desc: "管理文件和目录",      // 工具描述
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"action": {
 				Type:     "string",
@@ -243,14 +243,14 @@ func (f *FileManagerTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 				Enum:     []string{"list", "create", "read", "delete", "info"}, // 支持的操作类型枚举
 			},
 			"path": {
-				Type:     "string", 
-				Desc:     "文件路径", 
-				Required: true,     // 文件路径是必需参数
+				Type:     "string",
+				Desc:     "文件路径",
+				Required: true, // 文件路径是必需参数
 			},
 			"content": {
-				Type:     "string", 
-				Desc:     "文件内容（创建文件时使用）", 
-				Required: false,    // 仅在创建文件时需要
+				Type:     "string",
+				Desc:     "文件内容（创建文件时使用）",
+				Required: false, // 仅在创建文件时需要
 			},
 		}),
 	}, nil
@@ -292,9 +292,9 @@ func demonstrateToolsNode() {
 
 	// 1. 创建各种工具实例
 	// 每个工具都实现了 InvokableTool 接口，提供特定的功能
-	weatherTool := &WeatherTool{}       // 天气查询工具
-	calculatorTool := &CalculatorTool{} // 数学计算工具
-	translatorTool := &TranslatorTool{} // 文本翻译工具
+	weatherTool := &WeatherTool{}         // 天气查询工具
+	calculatorTool := &CalculatorTool{}   // 数学计算工具
+	translatorTool := &TranslatorTool{}   // 文本翻译工具
 	fileManagerTool := &FileManagerTool{} // 文件管理工具
 
 	// 2. 将所有工具组织成工具列表
@@ -325,13 +325,13 @@ func demonstrateToolsNode() {
 	// 创建一个模拟的 LLM 消息，表示 AI 助手决定调用天气工具
 	// 在实际应用中，这种消息通常由 LLM 生成，包含工具调用的指令
 	weatherMessage := &schema.Message{
-		Role: "assistant",  // 消息来自 AI 助手
+		Role: "assistant", // 消息来自 AI 助手
 		ToolCalls: []schema.ToolCall{
 			{
 				ID:   "call_weather_001", // 工具调用的唯一标识符
 				Type: "function",         // 调用类型为函数调用
 				Function: schema.FunctionCall{
-					Name:      "get_weather",                                 // 要调用的工具名称
+					Name:      "get_weather",                          // 要调用的工具名称
 					Arguments: `{"city": "北京", "date": "2024-08-19"}`, // JSON 格式的工具参数
 				},
 			},
@@ -358,7 +358,7 @@ func demonstrateToolsNode() {
 		Role: "assistant", // 消息来自 AI 助手
 		ToolCalls: []schema.ToolCall{
 			{
-				ID:   "call_calc_001",    // 计算器工具调用
+				ID:   "call_calc_001", // 计算器工具调用
 				Type: "function",
 				Function: schema.FunctionCall{
 					Name:      "calculator",
@@ -374,7 +374,7 @@ func demonstrateToolsNode() {
 				},
 			},
 			{
-				ID:   "call_file_001",   // 文件管理工具调用
+				ID:   "call_file_001", // 文件管理工具调用
 				Type: "function",
 				Function: schema.FunctionCall{
 					Name:      "file_manager",
@@ -441,9 +441,9 @@ func demonstrateToolsNodeInChain(toolsNode *MockToolsNode) {
 	// 说明：这是一个模拟实现，展示 ToolsNode 在真实工作流中的使用场景
 	// 在实际项目中，应该使用 Eino 的 compose.NewChain() 来创建真正的工作流链
 	fmt.Println("模拟 Chain 工作流:")
-	fmt.Println("  1. 用户消息 -> LLM 生成")      // 用户输入传递给 LLM
+	fmt.Println("  1. 用户消息 -> LLM 生成")         // 用户输入传递给 LLM
 	fmt.Println("  2. LLM 生成 -> ToolsNode 执行") // LLM 决定调用工具，ToolsNode 执行
-	fmt.Println("  3. 工具结果 -> LLM 最终回复")    // 工具结果返回给 LLM，生成最终回复
+	fmt.Println("  3. 工具结果 -> LLM 最终回复")       // 工具结果返回给 LLM，生成最终回复
 
 	// 模拟 LLM 的决策输出
 	// 在真实场景中，这个消息会由 LLM 根据用户输入自动生成
@@ -504,7 +504,7 @@ type MockToolsNode struct {
 func NewMockToolsNode(tools []InvokableTool) *MockToolsNode {
 	// 创建工具名称到工具实例的映射
 	toolMap := make(map[string]InvokableTool)
-	
+
 	// 遍历所有工具，获取其名称并建立映射
 	for _, tool := range tools {
 		info, err := tool.Info(context.Background())
@@ -514,7 +514,7 @@ func NewMockToolsNode(tools []InvokableTool) *MockToolsNode {
 		}
 		toolMap[info.Name] = tool // 使用工具名称作为键
 	}
-	
+
 	return &MockToolsNode{tools: toolMap}
 }
 
@@ -547,10 +547,10 @@ func (n *MockToolsNode) Invoke(ctx context.Context, msg *schema.Message) ([]*sch
 
 		// 将工具执行结果包装成消息格式
 		result := &schema.Message{
-			Role:       "tool",              // 消息来源为工具
-			Content:    output,              // 工具执行结果
-			Name:       call.Function.Name,  // 工具名称
-			ToolCallID: call.ID,             // 对应的工具调用 ID
+			Role:       "tool",             // 消息来源为工具
+			Content:    output,             // 工具执行结果
+			Name:       call.Function.Name, // 工具名称
+			ToolCallID: call.ID,            // 对应的工具调用 ID
 		}
 		results = append(results, result)
 	}
@@ -598,8 +598,8 @@ func simulateTranslation(text, fromLang, toLang string) string {
 	// 键为原文，值为目标语言代码到翻译文本的映射
 	translations := map[string]map[string]string{
 		"Hello World": {
-			"zh": "你好世界",        // 中文翻译
-			"es": "Hola Mundo",     // 西班牙语翻译
+			"zh": "你好世界",             // 中文翻译
+			"es": "Hola Mundo",       // 西班牙语翻译
 			"fr": "Bonjour le Monde", // 法语翻译
 		},
 		"Good morning": {
@@ -638,17 +638,17 @@ func simulateFileOperation(action, path, content string) map[string]interface{} 
 		return map[string]interface{}{
 			"action":      "info",
 			"path":        path,
-			"exists":      true,                                    // 模拟文件存在
-			"size":        1024,                                    // 模拟文件大小（字节）
-			"modified":    time.Now().Format(time.RFC3339),        // 模拟修改时间
-			"permissions": "rw-r--r--",                             // 模拟文件权限
+			"exists":      true,                            // 模拟文件存在
+			"size":        1024,                            // 模拟文件大小（字节）
+			"modified":    time.Now().Format(time.RFC3339), // 模拟修改时间
+			"permissions": "rw-r--r--",                     // 模拟文件权限
 		}
 	case "create":
 		// 模拟文件创建操作
 		return map[string]interface{}{
 			"action":  "create",
 			"path":    path,
-			"success": true,                                        // 模拟创建成功
+			"success": true, // 模拟创建成功
 			"message": fmt.Sprintf("文件 %s 创建成功", path),
 		}
 	default:
