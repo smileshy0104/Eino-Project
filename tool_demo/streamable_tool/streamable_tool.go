@@ -60,7 +60,7 @@ func (s *StreamTextGeneratorTool) InvokableRun(ctx context.Context, argumentsInJ
 		return "", err
 	}
 	defer reader.Close()
-	
+
 	// 收集所有流式输出块并拼接成完整结果
 	var result strings.Builder
 	for {
@@ -73,7 +73,7 @@ func (s *StreamTextGeneratorTool) InvokableRun(ctx context.Context, argumentsInJ
 		}
 		result.WriteString(chunk)
 	}
-	
+
 	return result.String(), nil
 }
 
@@ -81,16 +81,16 @@ func (s *StreamTextGeneratorTool) InvokableRun(ctx context.Context, argumentsInJ
 func (s *StreamTextGeneratorTool) StreamableRun(ctx context.Context, argumentsInJSON string, opts ...interface{}) (*schema.StreamReader[string], error) {
 	// 定义输入参数结构体
 	var args struct {
-		Topic   string `json:"topic"`   // 生成文本的主题
-		Length  int    `json:"length"`  // 生成段落数量
+		Topic   string `json:"topic"`    // 生成文本的主题
+		Length  int    `json:"length"`   // 生成段落数量
 		DelayMs int    `json:"delay_ms"` // 每段之间的延迟毫秒数
 	}
-	
+
 	// 解析 JSON 参数
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
 		return nil, fmt.Errorf("参数解析失败: %v", err)
 	}
-	
+
 	// 设置默认值
 	if args.Length == 0 {
 		args.Length = 3 // 默认生成3段
@@ -98,24 +98,24 @@ func (s *StreamTextGeneratorTool) StreamableRun(ctx context.Context, argumentsIn
 	if args.DelayMs == 0 {
 		args.DelayMs = 500 // 默认延迟500毫秒
 	}
-	
+
 	log.Printf("[StreamTextGenerator] 开始生成关于 '%s' 的文本，共 %d 段", args.Topic, args.Length)
-	
+
 	// 创建用于流式数据传递的 channels
 	// resultChan: 传递生成的文本内容，缓冲大小为段落数+1（包括完成消息）
 	// errorChan: 传递错误信息，缓冲大小为1
 	resultChan := make(chan string, args.Length+1)
 	errorChan := make(chan error, 1)
-	
+
 	// 启动 goroutine 异步生成内容
 	go func() {
 		// 确保 channels 在函数结束时被关闭
 		defer close(resultChan)
 		defer close(errorChan)
-		
+
 		// 生成指定主题和数量的段落内容
 		paragraphs := generateTopicParagraphs(args.Topic, args.Length)
-		
+
 		for i, paragraph := range paragraphs {
 			select {
 			case <-ctx.Done():
@@ -140,7 +140,7 @@ func (s *StreamTextGeneratorTool) StreamableRun(ctx context.Context, argumentsIn
 				}
 			}
 		}
-		
+
 		// 发送完成消息
 		select {
 		case <-ctx.Done():
@@ -152,11 +152,11 @@ func (s *StreamTextGeneratorTool) StreamableRun(ctx context.Context, argumentsIn
 		case resultChan <- fmt.Sprintf("--- 关于 '%s' 的文本生成完成 ---", args.Topic):
 		}
 	}()
-	
+
 	// 创建 StreamReader
 	// 注意: 实际使用时需要根据 Eino 框架的具体实现来创建 StreamReader
 	reader := createMockStreamReader(resultChan, errorChan)
-	
+
 	return reader, nil
 }
 
@@ -199,7 +199,7 @@ func (d *StreamDataProcessorTool) InvokableRun(ctx context.Context, argumentsInJ
 		return "", err
 	}
 	defer reader.Close()
-	
+
 	var result strings.Builder
 	for {
 		chunk, err := reader.Recv()
@@ -211,7 +211,7 @@ func (d *StreamDataProcessorTool) InvokableRun(ctx context.Context, argumentsInJ
 		}
 		result.WriteString(chunk)
 	}
-	
+
 	return result.String(), nil
 }
 
@@ -222,26 +222,26 @@ func (d *StreamDataProcessorTool) StreamableRun(ctx context.Context, argumentsIn
 		Operation string    `json:"operation"`
 		BatchSize int       `json:"batch_size"`
 	}
-	
+
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
 		return nil, fmt.Errorf("参数解析失败: %v", err)
 	}
-	
+
 	if args.BatchSize == 0 {
 		args.BatchSize = 5
 	}
-	
+
 	log.Printf("[StreamDataProcessor] 处理 %d 个数据点，操作: %s", len(args.Data), args.Operation)
-	
+
 	resultChan := make(chan string, len(args.Data)/args.BatchSize+2)
 	errorChan := make(chan error, 1)
-	
+
 	go func() {
 		defer close(resultChan)
 		defer close(errorChan)
-		
+
 		totalBatches := (len(args.Data) + args.BatchSize - 1) / args.BatchSize
-		
+
 		for batchIndex := 0; batchIndex < totalBatches; batchIndex++ {
 			select {
 			case <-ctx.Done():
@@ -256,10 +256,10 @@ func (d *StreamDataProcessorTool) StreamableRun(ctx context.Context, argumentsIn
 				if end > len(args.Data) {
 					end = len(args.Data)
 				}
-				
+
 				batch := args.Data[start:end]
 				processedBatch := make([]float64, len(batch))
-				
+
 				// 处理当前批次
 				for i, value := range batch {
 					switch args.Operation {
@@ -273,7 +273,7 @@ func (d *StreamDataProcessorTool) StreamableRun(ctx context.Context, argumentsIn
 						processedBatch[i] = value
 					}
 				}
-				
+
 				// 发送批次处理结果
 				batchResult := map[string]interface{}{
 					"batch_index":    batchIndex + 1,
@@ -282,9 +282,9 @@ func (d *StreamDataProcessorTool) StreamableRun(ctx context.Context, argumentsIn
 					"original_data":  batch,
 					"progress":       fmt.Sprintf("%.1f%%", float64(batchIndex+1)/float64(totalBatches)*100),
 				}
-				
+
 				resultBytes, _ := json.Marshal(batchResult)
-				
+
 				select {
 				case <-ctx.Done():
 					select {
@@ -294,7 +294,7 @@ func (d *StreamDataProcessorTool) StreamableRun(ctx context.Context, argumentsIn
 					return
 				case resultChan <- string(resultBytes) + "\n":
 				}
-				
+
 				// 模拟处理延迟，同时检查上下文取消
 				select {
 				case <-ctx.Done():
@@ -307,17 +307,17 @@ func (d *StreamDataProcessorTool) StreamableRun(ctx context.Context, argumentsIn
 				}
 			}
 		}
-		
+
 		// 发送完成消息
 		summary := map[string]interface{}{
-			"status":       "completed",
-			"total_items":  len(args.Data),
-			"operation":    args.Operation,
-			"batch_size":   args.BatchSize,
+			"status":        "completed",
+			"total_items":   len(args.Data),
+			"operation":     args.Operation,
+			"batch_size":    args.BatchSize,
 			"total_batches": totalBatches,
 		}
 		summaryBytes, _ := json.Marshal(summary)
-		
+
 		select {
 		case <-ctx.Done():
 			select {
@@ -328,7 +328,7 @@ func (d *StreamDataProcessorTool) StreamableRun(ctx context.Context, argumentsIn
 		case resultChan <- string(summaryBytes):
 		}
 	}()
-	
+
 	return createMockStreamReader(resultChan, errorChan), nil
 }
 
@@ -365,7 +365,7 @@ func (l *StreamLogAnalyzerTool) InvokableRun(ctx context.Context, argumentsInJSO
 		return "", err
 	}
 	defer reader.Close()
-	
+
 	var result strings.Builder
 	for {
 		chunk, err := reader.Recv()
@@ -377,7 +377,7 @@ func (l *StreamLogAnalyzerTool) InvokableRun(ctx context.Context, argumentsInJSO
 		}
 		result.WriteString(chunk)
 	}
-	
+
 	return result.String(), nil
 }
 
@@ -387,22 +387,22 @@ func (l *StreamLogAnalyzerTool) StreamableRun(ctx context.Context, argumentsInJS
 		LogContent    string   `json:"log_content"`
 		AnalysisTypes []string `json:"analysis_types"`
 	}
-	
+
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
 		return nil, fmt.Errorf("参数解析失败: %v", err)
 	}
-	
+
 	log.Printf("[StreamLogAnalyzer] 分析日志，长度: %d", len(args.LogContent))
-	
+
 	resultChan := make(chan string, len(args.AnalysisTypes)+2)
 	errorChan := make(chan error, 1)
-	
+
 	go func() {
 		defer close(resultChan)
 		defer close(errorChan)
-		
+
 		lines := strings.Split(args.LogContent, "\n")
-		
+
 		for _, analysisType := range args.AnalysisTypes {
 			select {
 			case <-ctx.Done():
@@ -422,17 +422,17 @@ func (l *StreamLogAnalyzerTool) StreamableRun(ctx context.Context, argumentsInJS
 					return
 				case <-time.After(300 * time.Millisecond):
 				}
-				
+
 				result := performLogAnalysis(lines, analysisType)
-				
+
 				analysisResult := map[string]interface{}{
 					"analysis_type": analysisType,
 					"result":        result,
 					"timestamp":     time.Now().Format(time.RFC3339),
 				}
-				
+
 				resultBytes, _ := json.Marshal(analysisResult)
-				
+
 				select {
 				case <-ctx.Done():
 					select {
@@ -444,7 +444,7 @@ func (l *StreamLogAnalyzerTool) StreamableRun(ctx context.Context, argumentsInJS
 				}
 			}
 		}
-		
+
 		// 发送分析完成消息
 		completionMsg := `{"status": "analysis_completed", "total_types": ` + fmt.Sprintf("%d", len(args.AnalysisTypes)) + `}`
 		select {
@@ -457,7 +457,7 @@ func (l *StreamLogAnalyzerTool) StreamableRun(ctx context.Context, argumentsInJS
 		case resultChan <- completionMsg:
 		}
 	}()
-	
+
 	return createMockStreamReader(resultChan, errorChan), nil
 }
 
@@ -465,10 +465,13 @@ func (l *StreamLogAnalyzerTool) StreamableRun(ctx context.Context, argumentsInJS
 
 // generateTopicParagraphs 根据指定主题生成指定数量的段落内容
 // 参数:
-//   topic: 文本主题
-//   count: 需要生成的段落数量
+//
+//	topic: 文本主题
+//	count: 需要生成的段落数量
+//
 // 返回:
-//   []string: 生成的段落内容数组
+//
+//	[]string: 生成的段落内容数组
 func generateTopicParagraphs(topic string, count int) []string {
 	// 预定义的段落模板，用于生成不同样式的内容
 	templates := []string{
@@ -478,7 +481,7 @@ func generateTopicParagraphs(topic string, count int) []string {
 		"通过深入了解 %s，我们能够获得更多宝贵的洞察。",
 		"%s 的应用范围很广，对多个行业都有重要影响。",
 	}
-	
+
 	var paragraphs []string
 	// 循环使用模板生成指定数量的段落
 	for i := 0; i < count; i++ {
@@ -486,16 +489,19 @@ func generateTopicParagraphs(topic string, count int) []string {
 		paragraph := fmt.Sprintf(template, topic)
 		paragraphs = append(paragraphs, paragraph)
 	}
-	
+
 	return paragraphs
 }
 
 // performLogAnalysis 执行指定类型的日志分析
 // 参数:
-//   lines: 日志行数组
-//   analysisType: 分析类型（error_count, warning_count, line_count, unique_ips）
+//
+//	lines: 日志行数组
+//	analysisType: 分析类型（error_count, warning_count, line_count, unique_ips）
+//
 // 返回:
-//   interface{}: 分析结果（类型根据分析类型而定）
+//
+//	interface{}: 分析结果（类型根据分析类型而定）
 func performLogAnalysis(lines []string, analysisType string) interface{} {
 	switch analysisType {
 	case "error_count":
@@ -537,67 +543,53 @@ func performLogAnalysis(lines []string, analysisType string) interface{} {
 
 // createMockStreamReader 创建模拟的 StreamReader
 func createMockStreamReader(resultChan <-chan string, errorChan <-chan error) *schema.StreamReader[string] {
-	// 注意：这是一个模拟实现，实际的 Eino 框架可能有不同的 StreamReader 实现
-	// 这里只是为了演示流式工具的概念
+	// 使用 schema.Pipe 创建一个 StreamReader 和 StreamWriter 对
+	reader, writer := schema.Pipe[string](100) // 缓冲区大小为100
 	
-	// 在实际使用中，应该参考 Eino 框架的具体实现来创建 StreamReader
-	// 这里我们创建一个空的 StreamReader，在实际项目中需要正确初始化
-	reader := &schema.StreamReader[string]{}
-	
-	// 实际实现中，这里应该设置 StreamReader 的内部字段和方法
-	// 由于无法直接访问 schema.StreamReader 的内部实现，
-	// 在真实项目中需要查看 Eino 框架文档来正确创建 StreamReader
-	
-	// 为了消除未使用参数的警告，这里记录一下参数（在实际实现中会被使用）
-	_ = resultChan
-	_ = errorChan
+	// 启动一个 goroutine 将 channel 数据写入到 StreamWriter 中
+	go func() {
+		defer writer.Close() // 确保写入器最终被关闭
+		
+		for {
+			select {
+			case data, ok := <-resultChan:
+				if !ok {
+					// resultChan 已关闭，正常结束
+					return
+				}
+				closed := writer.Send(data, nil)
+				if closed {
+					// 写入器已关闭，退出
+					return
+				}
+			case err := <-errorChan:
+				if err != nil {
+					// 发生错误，发送错误并退出
+					writer.Send("", err)
+					return
+				}
+			}
+		}
+	}()
 	
 	return reader
 }
 
-// MockStreamReader 模拟的 StreamReader 实现
-// 注意：这是一个演示用的实现，实际使用时应参考 Eino 框架的官方文档
-type MockStreamReader struct {
-	resultChan <-chan string // 接收结果数据的 channel
-	errorChan  <-chan error  // 接收错误信息的 channel  
-	closed     bool          // 标记是否已关闭
-}
-
-// Recv 从流中接收下一个数据块
-func (r *MockStreamReader) Recv() (string, error) {
-	if r.closed {
-		return "", io.EOF
-	}
-	
-	select {
-	case result, ok := <-r.resultChan:
-		if !ok {
-			return "", io.EOF // channel 已关闭，表示流结束
-		}
-		return result, nil
-	case err := <-r.errorChan:
-		return "", err // 返回错误
-	}
-}
-
-// Close 关闭流读取器
-func (r *MockStreamReader) Close() error {
-	r.closed = true
-	return nil
-}
+// 注意：我们现在使用 Eino 框架提供的 schema.Pipe 来创建真正的 StreamReader，
+// 不再需要自定义的 MockStreamReader 实现
 
 // --- 演示函数 ---
 
 // demonstrateStreamableTools 演示各种流式工具的使用方法
 func demonstrateStreamableTools() {
 	ctx := context.Background()
-	
+
 	fmt.Println("=== 流式 Tool 实现演示 ===")
-	
+
 	// 1. 测试流式文本生成工具
 	fmt.Println("--- 流式文本生成工具 ---")
 	textGenerator := &StreamTextGeneratorTool{}
-	
+
 	fmt.Println("开始流式生成文本...")
 	// 调用流式文本生成工具，生成关于"人工智能"主题的3段文本
 	textResult, err := textGenerator.InvokableRun(ctx, `{
@@ -610,11 +602,11 @@ func demonstrateStreamableTools() {
 	} else {
 		fmt.Printf("生成结果:\n%s\n", textResult)
 	}
-	
+
 	// 2. 测试流式数据处理工具
 	fmt.Println("--- 流式数据处理工具 ---")
 	dataProcessor := &StreamDataProcessorTool{}
-	
+
 	fmt.Println("开始流式处理数据...")
 	// 调用流式数据处理工具，对数据进行平方运算，每批处理3个数据
 	dataResult, err := dataProcessor.InvokableRun(ctx, `{
@@ -627,18 +619,18 @@ func demonstrateStreamableTools() {
 	} else {
 		fmt.Printf("处理结果:\n%s\n", dataResult)
 	}
-	
+
 	// 3. 测试流式日志分析工具
 	fmt.Println("--- 流式日志分析工具 ---")
 	logAnalyzer := &StreamLogAnalyzerTool{}
-	
+
 	// 模拟日志内容，包含不同级别的日志信息
 	logContent := `2024-08-19 10:00:01 INFO Starting application
 2024-08-19 10:00:02 ERROR Failed to connect to database
 2024-08-19 10:00:03 WARNING Connection retry attempt 1
 2024-08-19 10:00:04 INFO Connection established
 2024-08-19 10:00:05 ERROR Authentication failed`
-	
+
 	fmt.Println("开始流式分析日志...")
 	// 调用流式日志分析工具，分析错误数量、警告数量和总行数
 	logResult, err := logAnalyzer.InvokableRun(ctx, fmt.Sprintf(`{

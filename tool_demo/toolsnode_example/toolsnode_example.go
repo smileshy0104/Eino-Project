@@ -206,7 +206,7 @@ func (f *FileManagerTool) InvokableRun(ctx context.Context, argumentsInJSON stri
 func demonstrateToolsNode() {
 	ctx := context.Background()
 
-	fmt.Println("=== ToolsNode 完整使用演示 ===\n")
+	fmt.Println("=== ToolsNode 完整使用演示 ===")
 
 	// 1. 创建工具实例
 	weatherTool := &WeatherTool{}
