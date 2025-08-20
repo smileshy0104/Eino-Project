@@ -1,3 +1,4 @@
+// Package main 演示如何使用 NewTool 包装普通函数为 Eino Tool
 package main
 
 import (
@@ -36,11 +37,19 @@ type AdditionResponse struct {
 }
 
 // addNumbers 执行加法运算的业务函数
+// 参数:
+//   - ctx: 上下文对象
+//   - req: 包含两个数字的加法请求
+// 返回:
+//   - 包含运算结果、操作描述和时间戳的响应对象
+//   - 错误信息（本例中总是返回 nil）
 func addNumbers(ctx context.Context, req *AdditionRequest) (*AdditionResponse, error) {
 	log.Printf("[AddNumbers] 执行加法: %f + %f", req.A, req.B)
 
+	// 执行加法运算
 	result := req.A + req.B
 
+	// 构造并返回响应
 	return &AdditionResponse{
 		Result:    result,
 		Operation: fmt.Sprintf("%.2f + %.2f", req.A, req.B),
@@ -61,12 +70,19 @@ type StringFormatResponse struct {
 }
 
 // formatString 字符串模板格式化函数
+// 参数:
+//   - ctx: 上下文对象
+//   - req: 包含模板字符串和替换值的请求
+// 返回:
+//   - 包含格式化后文本和替换占位符数量的响应对象
+//   - 错误信息（本例中总是返回 nil）
 func formatString(ctx context.Context, req *StringFormatRequest) (*StringFormatResponse, error) {
 	log.Printf("[FormatString] 格式化模板: %s", req.Template)
 
 	result := req.Template
 	count := 0
 
+	// 遍历所有替换值，查找并替换模板中的占位符
 	for key, value := range req.Values {
 		placeholder := fmt.Sprintf("{%s}", key)
 		if strings.Contains(result, placeholder) {
@@ -96,27 +112,33 @@ type ValidationResponse struct {
 }
 
 // validateUserData 用户数据验证函数
+// 参数:
+//   - ctx: 上下文对象
+//   - req: 包含用户数据的验证请求
+// 返回:
+//   - 包含验证结果和错误信息的响应对象
+//   - 错误信息（本例中总是返回 nil）
 func validateUserData(ctx context.Context, req *ValidationRequest) (*ValidationResponse, error) {
 	log.Printf("[ValidateUserData] 验证用户数据: %s", req.Username)
 
 	var errors []string
 
-	// 验证邮箱
+	// 验证邮箱格式：必须包含 @ 和 . 符号
 	if !strings.Contains(req.Email, "@") || !strings.Contains(req.Email, ".") {
 		errors = append(errors, "邮箱格式不正确")
 	}
 
-	// 验证手机号
+	// 验证手机号长度：必须为11位
 	if len(req.Phone) != 11 {
 		errors = append(errors, "手机号长度不正确")
 	}
 
-	// 验证年龄
+	// 验证年龄范围：0-150岁
 	if req.Age < 0 || req.Age > 150 {
 		errors = append(errors, "年龄不在有效范围内")
 	}
 
-	// 验证用户名
+	// 验证用户名长度：3-20个字符
 	if len(req.Username) < 3 || len(req.Username) > 20 {
 		errors = append(errors, "用户名长度应在3-20个字符之间")
 	}
@@ -144,9 +166,16 @@ type ConversionResponse struct {
 }
 
 // convertUnits 单位转换函数（温度转换示例）
+// 参数:
+//   - ctx: 上下文对象
+//   - req: 包含转换值和单位的请求
+// 返回:
+//   - 包含转换结果和转换公式的响应对象
+//   - 错误信息（解析失败或不支持的转换时）
 func convertUnits(ctx context.Context, req *ConversionRequest) (*ConversionResponse, error) {
 	log.Printf("[ConvertUnits] 转换 %s from %s to %s", req.Value, req.FromUnit, req.ToUnit)
 
+	// 解析输入的数值
 	value, err := strconv.ParseFloat(req.Value, 64)
 	if err != nil {
 		return nil, fmt.Errorf("无法解析数值: %v", err)
@@ -155,7 +184,7 @@ func convertUnits(ctx context.Context, req *ConversionRequest) (*ConversionRespo
 	var result float64
 	var formula string
 
-	// 简单的温度转换示例
+	// 简单的温度转换示例，支持摄氏度、华氏度、开尔文温度之间的转换
 	switch {
 	case req.FromUnit == "celsius" && req.ToUnit == "fahrenheit":
 		result = value*9/5 + 32
@@ -184,12 +213,14 @@ func convertUnits(ctx context.Context, req *ConversionRequest) (*ConversionRespo
 
 // --- 演示如何使用 NewTool 包装这些函数 ---
 
+// demonstrateNewTool 演示如何使用 NewTool 包装普通函数为 Eino 工具
 func demonstrateNewTool() {
 	ctx := context.Background()
 
-	fmt.Println("=== NewTool 包装函数演示 ===\n")
+	fmt.Println("=== NewTool 包装函数演示 ===")
 
-	// 1. 包装加法函数
+	// 1. 包装加法函数为工具
+	// 定义工具的元信息：名称、描述、参数说明
 	additionToolInfo := &schema.ToolInfo{
 		Name: "add_numbers",
 		Desc: "执行两个数字的加法运算",
@@ -199,9 +230,11 @@ func demonstrateNewTool() {
 		}),
 	}
 
+	// 使用 NewTool 将普通函数包装为 Eino 工具
 	additionTool := utils.NewTool(additionToolInfo, addNumbers)
 
 	fmt.Println("--- 加法工具测试 ---")
+	// 调用工具，传入 JSON 格式的参数
 	addResult, err := additionTool.InvokableRun(ctx, `{"a": 15.5, "b": 24.3}`)
 	if err != nil {
 		log.Printf("加法工具执行失败: %v", err)
@@ -209,7 +242,7 @@ func demonstrateNewTool() {
 		fmt.Printf("加法结果: %s\n\n", addResult)
 	}
 
-	// 2. 包装字符串格式化函数
+	// 2. 包装字符串格式化函数为工具
 	stringToolInfo := &schema.ToolInfo{
 		Name: "format_string",
 		Desc: "使用提供的值格式化字符串模板",
@@ -222,6 +255,7 @@ func demonstrateNewTool() {
 	stringTool := utils.NewTool(stringToolInfo, formatString)
 
 	fmt.Println("--- 字符串格式化工具测试 ---")
+	// 测试字符串模板格式化功能
 	stringResult, err := stringTool.InvokableRun(ctx, `{
 		"template": "Hello {name}, welcome to {city}!",
 		"values": {
@@ -235,7 +269,7 @@ func demonstrateNewTool() {
 		fmt.Printf("格式化结果: %s\n\n", stringResult)
 	}
 
-	// 3. 包装数据验证函数
+	// 3. 包装数据验证函数为工具
 	validationToolInfo := &schema.ToolInfo{
 		Name: "validate_user_data",
 		Desc: "验证用户数据的有效性",
@@ -250,6 +284,7 @@ func demonstrateNewTool() {
 	validationTool := utils.NewTool(validationToolInfo, validateUserData)
 
 	fmt.Println("--- 数据验证工具测试 ---")
+	// 测试用户数据验证功能
 	validationResult, err := validationTool.InvokableRun(ctx, `{
 		"email": "user@example.com",
 		"phone": "13812345678",
@@ -262,7 +297,7 @@ func demonstrateNewTool() {
 		fmt.Printf("验证结果: %s\n\n", validationResult)
 	}
 
-	// 4. 包装单位转换函数
+	// 4. 包装单位转换函数为工具
 	conversionToolInfo := &schema.ToolInfo{
 		Name: "convert_temperature",
 		Desc: "转换温度单位",
@@ -276,6 +311,7 @@ func demonstrateNewTool() {
 	conversionTool := utils.NewTool(conversionToolInfo, convertUnits)
 
 	fmt.Println("--- 温度转换工具测试 ---")
+	// 测试温度单位转换功能
 	conversionResult, err := conversionTool.InvokableRun(ctx, `{
 		"value": "25",
 		"from_unit": "celsius",
@@ -288,6 +324,7 @@ func demonstrateNewTool() {
 	}
 }
 
+// main 函数：程序入口点，执行所有演示
 func main() {
 	demonstrateNewTool()
 }
