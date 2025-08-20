@@ -515,6 +515,6 @@ func simulateFileOperation(action, path, content string) map[string]interface{} 
 	}
 }
 
-// func main() {
-// 	demonstrateToolsNode()
-// }
+func main() {
+	demonstrateToolsNode()
+}
