@@ -15,19 +15,18 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
-	
+
 	// Eino 扩展组件
 	"github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown"
 	embedder "github.com/cloudwego/eino-ext/components/embedding/ark"
 	"github.com/cloudwego/eino-ext/components/indexer/milvus"
 	"github.com/cloudwego/eino-ext/components/model/ark"
 	retriever "github.com/cloudwego/eino-ext/components/retriever/milvus"
-	
+
 	// Milvus SDK
 	cli "github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
-	
-	
+
 	// 配置管理
 	"github.com/spf13/viper"
 )
@@ -46,14 +45,14 @@ import (
 
 // Config 应用程序配置结构
 type Config struct {
-	MilvusAddress    string `mapstructure:"MILVUS_ADDRESS"`
-	MilvusCollection string `mapstructure:"MILVUS_COLLECTION"`
-	ArkAPIKey        string `mapstructure:"ARK_API_KEY"`
-	EmbedderModel    string `mapstructure:"EMBEDDER_MODEL"`
-	ArkModel         string `mapstructure:"ARK_MODEL"`
+	MilvusAddress    string `mapstructure:"MILVUS_ADDRESS"`    // Milvus 服务地址
+	MilvusCollection string `mapstructure:"MILVUS_COLLECTION"` // Milvus 集合名称
+	ArkAPIKey        string `mapstructure:"ARK_API_KEY"`       // Ark API Key
+	EmbedderModel    string `mapstructure:"EMBEDDER_MODEL"`    // 嵌入模型名称
+	ArkModel         string `mapstructure:"ARK_MODEL"`         // Ark 模型名称
 }
 
-// Milvus 集合结构定义
+// Milvus 集合结构定义（必须跟Milvus集合结构一致）
 var milvusSchema = []*entity.Field{
 	{
 		Name:        "id",
@@ -87,7 +86,7 @@ var milvusSchema = []*entity.Field{
 
 // KnowledgeSearchTool 知识搜索工具 - 从向量数据库检索相关知识
 type KnowledgeSearchTool struct {
-	retriever *retriever.Retriever
+	retriever *retriever.Retriever // KnowledgeSearchTool 实现了 tool.BaseTool 接口
 }
 
 // Info 返回知识搜索工具的信息
@@ -102,7 +101,7 @@ func (k *KnowledgeSearchTool) Info(ctx context.Context) (*schema.ToolInfo, error
 				Required: true,
 			},
 			"top_k": {
-				Type:     "integer", 
+				Type:     "integer",
 				Desc:     "返回结果数量",
 				Required: false,
 			},
@@ -112,34 +111,36 @@ func (k *KnowledgeSearchTool) Info(ctx context.Context) (*schema.ToolInfo, error
 
 // InvokableRun 执行知识搜索
 func (k *KnowledgeSearchTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...interface{}) (string, error) {
+	// 解析输入参数
 	var args struct {
 		Query string `json:"query"`
 		TopK  int    `json:"top_k"`
 	}
-	
+
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
 		return "", fmt.Errorf("参数解析失败: %v", err)
 	}
-	
+
+	// 设置默认 TopK
 	if args.TopK == 0 {
 		args.TopK = 3 // 默认返回前3个结果
 	}
-	
+
 	log.Printf("[KnowledgeSearchTool] 搜索知识: %s (TopK: %d)", args.Query, args.TopK)
-	
+
 	// 执行检索
 	docs, err := k.retriever.Retrieve(ctx, args.Query)
 	if err != nil {
 		return "", fmt.Errorf("知识检索失败: %v", err)
 	}
-	
+
 	// 构建结果
 	result := map[string]interface{}{
-		"query":        args.Query,
-		"found_count":  len(docs),
-		"knowledge":    []map[string]interface{}{},
+		"query":       args.Query,
+		"found_count": len(docs),
+		"knowledge":   []map[string]interface{}{},
 	}
-	
+
 	for i, doc := range docs {
 		if i >= args.TopK {
 			break
@@ -151,7 +152,7 @@ func (k *KnowledgeSearchTool) InvokableRun(ctx context.Context, argumentsInJSON 
 		}
 		result["knowledge"] = append(result["knowledge"].([]map[string]interface{}), knowledge)
 	}
-	
+
 	resultBytes, _ := json.Marshal(result)
 	return string(resultBytes), nil
 }
@@ -194,41 +195,41 @@ func (d *DocumentProcessorTool) InvokableRun(ctx context.Context, argumentsInJSO
 		DocID    string                 `json:"doc_id"`
 		MetaData map[string]interface{} `json:"metadata"`
 	}
-	
+
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
 		return "", fmt.Errorf("参数解析失败: %v", err)
 	}
-	
+
 	if args.DocID == "" {
 		args.DocID = fmt.Sprintf("doc_%d", time.Now().Unix())
 	}
-	
+
 	if args.MetaData == nil {
 		args.MetaData = make(map[string]interface{})
 	}
 	args.MetaData["processed_at"] = time.Now().Format(time.RFC3339)
-	
+
 	log.Printf("[DocumentProcessorTool] 处理文档: %s", args.DocID)
-	
+
 	// 创建原始文档
 	originalDoc := &schema.Document{
 		ID:       args.DocID,
 		Content:  args.Content,
 		MetaData: args.MetaData,
 	}
-	
+
 	// 使用 Transformer 分割文档
 	chunks, err := d.transformer.Transform(ctx, []*schema.Document{originalDoc})
 	if err != nil {
 		return "", fmt.Errorf("文档分割失败: %v", err)
 	}
-	
+
 	// 使用 Indexer 存储文档块
 	storedIDs, err := d.indexer.Store(ctx, chunks)
 	if err != nil {
 		return "", fmt.Errorf("文档索引失败: %v", err)
 	}
-	
+
 	result := map[string]interface{}{
 		"original_doc_id": args.DocID,
 		"chunks_count":    len(chunks),
@@ -236,7 +237,7 @@ func (d *DocumentProcessorTool) InvokableRun(ctx context.Context, argumentsInJSO
 		"status":          "success",
 		"message":         fmt.Sprintf("成功处理文档，分割为%d个块并完成索引", len(chunks)),
 	}
-	
+
 	resultBytes, _ := json.Marshal(result)
 	return string(resultBytes), nil
 }
@@ -264,22 +265,22 @@ func (c *CalculatorTool) InvokableRun(ctx context.Context, argumentsInJSON strin
 	var args struct {
 		Expression string `json:"expression"`
 	}
-	
+
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
 		return "", fmt.Errorf("参数解析失败: %v", err)
 	}
-	
+
 	log.Printf("[CalculatorTool] 计算表达式: %s", args.Expression)
-	
+
 	// 简单的表达式计算(演示用途)
 	result := evaluateSimpleExpression(args.Expression)
-	
+
 	response := map[string]interface{}{
 		"expression": args.Expression,
 		"result":     result,
 		"timestamp":  time.Now().Format(time.RFC3339),
 	}
-	
+
 	resultBytes, _ := json.Marshal(response)
 	return string(resultBytes), nil
 }
@@ -313,17 +314,17 @@ func (w *WeatherTool) InvokableRun(ctx context.Context, argumentsInJSON string, 
 		City string `json:"city"`
 		Date string `json:"date"`
 	}
-	
+
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
 		return "", fmt.Errorf("参数解析失败: %v", err)
 	}
-	
+
 	if args.Date == "" {
 		args.Date = time.Now().Format("2006-01-02")
 	}
-	
+
 	log.Printf("[WeatherTool] 查询天气: %s @ %s", args.City, args.Date)
-	
+
 	// 模拟天气数据
 	weatherData := map[string]interface{}{
 		"city":        args.City,
@@ -334,7 +335,7 @@ func (w *WeatherTool) InvokableRun(ctx context.Context, argumentsInJSON string, 
 		"wind_speed":  "微风",
 		"description": fmt.Sprintf("%s今日天气晴朗，温度适宜", args.City),
 	}
-	
+
 	result, _ := json.Marshal(weatherData)
 	return string(result), nil
 }
@@ -345,57 +346,58 @@ func (w *WeatherTool) InvokableRun(ctx context.Context, argumentsInJSON string, 
 
 // ComprehensiveRAGSystem 综合RAG系统
 type ComprehensiveRAGSystem struct {
-	config          *Config
-	embedder        *embedder.Embedder
-	milvusClient    cli.Client
-	indexer         *milvus.Indexer
-	retriever       *retriever.Retriever
-	transformer     document.Transformer
-	chatModel       *ark.ChatModel
-	tools           []tool.BaseTool
-	chain           *compose.Chain[string, *schema.Message]
+	config       *Config                                 // 系统配置
+	embedder     *embedder.Embedder                      // 嵌入模型
+	milvusClient cli.Client                              // Milvus 客户端
+	indexer      *milvus.Indexer                         // 向量索引器
+	retriever    *retriever.Retriever                    // 知识检索器
+	transformer  document.Transformer                    // 文档转换器
+	chatModel    *ark.ChatModel                          // 聊天模型
+	tools        []tool.BaseTool                         // 工具集
+	chain        *compose.Chain[string, *schema.Message] // 智能处理链
 }
 
 // NewComprehensiveRAGSystem 创建综合RAG系统实例
 func NewComprehensiveRAGSystem(ctx context.Context, config *Config) (*ComprehensiveRAGSystem, error) {
 	system := &ComprehensiveRAGSystem{config: config}
-	
+
 	// 1. 初始化 Embedder
 	if err := system.initEmbedder(ctx); err != nil {
 		return nil, fmt.Errorf("初始化Embedder失败: %v", err)
 	}
-	
+
 	// 2. 初始化 Milvus
 	if err := system.initMilvus(ctx); err != nil {
 		return nil, fmt.Errorf("初始化Milvus失败: %v", err)
 	}
-	
+
 	// 3. 初始化 Transformer
 	if err := system.initTransformer(ctx); err != nil {
 		return nil, fmt.Errorf("初始化Transformer失败: %v", err)
 	}
-	
+
 	// 4. 初始化 ChatModel
 	if err := system.initChatModel(ctx); err != nil {
 		return nil, fmt.Errorf("初始化ChatModel失败: %v", err)
 	}
-	
+
 	// 5. 初始化 Tools
 	if err := system.initTools(ctx); err != nil {
 		return nil, fmt.Errorf("初始化Tools失败: %v", err)
 	}
-	
+
 	// 6. 构建 Chain
 	if err := system.buildChain(ctx); err != nil {
 		return nil, fmt.Errorf("构建Chain失败: %v", err)
 	}
-	
+
 	return system, nil
 }
 
 // initEmbedder 初始化嵌入模型
 func (s *ComprehensiveRAGSystem) initEmbedder(ctx context.Context) error {
 	timeout := 30 * time.Second
+	// 创建 Embedder 实例
 	embedder, err := embedder.NewEmbedder(ctx, &embedder.EmbeddingConfig{
 		APIKey:  s.config.ArkAPIKey,
 		Model:   s.config.EmbedderModel,
@@ -404,6 +406,7 @@ func (s *ComprehensiveRAGSystem) initEmbedder(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// 设置 Embedder
 	s.embedder = embedder
 	log.Println("✓ Embedder 初始化成功")
 	return nil
@@ -417,12 +420,12 @@ func (s *ComprehensiveRAGSystem) initMilvus(ctx context.Context) error {
 		return err
 	}
 	s.milvusClient = client
-	
+
 	// 检查并创建集合
 	if err := s.setupMilvusCollection(ctx); err != nil {
 		return err
 	}
-	
+
 	// 初始化 Indexer
 	indexerCfg := &milvus.IndexerConfig{
 		Client:     client,
@@ -435,7 +438,7 @@ func (s *ComprehensiveRAGSystem) initMilvus(ctx context.Context) error {
 		return err
 	}
 	s.indexer = indexer
-	
+
 	// 初始化 Retriever
 	retrieverCfg := &retriever.RetrieverConfig{
 		Client:       client,
@@ -444,12 +447,14 @@ func (s *ComprehensiveRAGSystem) initMilvus(ctx context.Context) error {
 		OutputFields: []string{"content", "metadata"},
 		TopK:         5,
 	}
+	// 创建 Retriever 实例
 	retriever, err := retriever.NewRetriever(ctx, retrieverCfg)
 	if err != nil {
 		return err
 	}
+	// 设置 Retriever
 	s.retriever = retriever
-	
+
 	log.Println("✓ Milvus 组件初始化成功")
 	return nil
 }
@@ -460,7 +465,8 @@ func (s *ComprehensiveRAGSystem) setupMilvusCollection(ctx context.Context) erro
 	if err != nil {
 		return err
 	}
-	
+
+	// 创建 Milvus 集合
 	if !has {
 		log.Printf("创建 Milvus 集合: %s", s.config.MilvusCollection)
 		schema := &entity.Schema{
@@ -468,40 +474,42 @@ func (s *ComprehensiveRAGSystem) setupMilvusCollection(ctx context.Context) erro
 			Fields:         milvusSchema,
 			Description:    "综合RAG系统知识库",
 		}
-		
+
 		if err := s.milvusClient.CreateCollection(ctx, schema, entity.DefaultShardNumber); err != nil {
 			return err
 		}
-		
+
 		// 创建向量索引
 		binFlatIndex, err := entity.NewIndexBinFlat(entity.HAMMING, 128)
 		if err != nil {
 			return err
 		}
-		
+
 		if err := s.milvusClient.CreateIndex(ctx, s.config.MilvusCollection, "vector", binFlatIndex, false); err != nil {
 			return err
 		}
-		
+
 		log.Println("✓ Milvus 集合和索引创建成功")
 	} else {
 		log.Printf("✓ Milvus 集合 %s 已存在", s.config.MilvusCollection)
 	}
-	
+
 	return nil
 }
 
 // initTransformer 初始化文档转换器
 func (s *ComprehensiveRAGSystem) initTransformer(ctx context.Context) error {
+	// 创建 Markdown 分割器
 	transformer, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderConfig{
 		Headers: map[string]string{
-			"##": "Header 2",
+			"##":  "Header 2",
 			"###": "Header 3",
 		},
 	})
 	if err != nil {
 		return err
 	}
+	// 设置 Transformer
 	s.transformer = transformer
 	log.Println("✓ Transformer 初始化成功")
 	return nil
@@ -509,6 +517,7 @@ func (s *ComprehensiveRAGSystem) initTransformer(ctx context.Context) error {
 
 // initChatModel 初始化聊天模型
 func (s *ComprehensiveRAGSystem) initChatModel(ctx context.Context) error {
+	// 创建 Ark 聊天模型
 	model, err := ark.NewChatModel(ctx, &ark.ChatModelConfig{
 		APIKey: s.config.ArkAPIKey,
 		Model:  s.config.ArkModel,
@@ -516,6 +525,7 @@ func (s *ComprehensiveRAGSystem) initChatModel(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// 设置 ChatModel
 	s.chatModel = model
 	log.Println("✓ ChatModel 初始化成功")
 	return nil
@@ -525,19 +535,20 @@ func (s *ComprehensiveRAGSystem) initChatModel(ctx context.Context) error {
 func (s *ComprehensiveRAGSystem) initTools(ctx context.Context) error {
 	// 创建知识搜索工具
 	knowledgeTool := &KnowledgeSearchTool{retriever: s.retriever}
-	
+
 	// 创建文档处理工具
 	docTool := &DocumentProcessorTool{
 		indexer:     s.indexer,
 		transformer: s.transformer,
 	}
-	
+
 	// 创建其他工具
 	calcTool := &CalculatorTool{}
 	weatherTool := &WeatherTool{}
-	
+
+	// 设置工具集
 	s.tools = []tool.BaseTool{knowledgeTool, docTool, calcTool, weatherTool}
-	
+
 	log.Printf("✓ 初始化了 %d 个工具", len(s.tools))
 	return nil
 }
@@ -553,7 +564,7 @@ func (s *ComprehensiveRAGSystem) buildChain(ctx context.Context) error {
 // LoadInitialKnowledge 加载初始知识库
 func (s *ComprehensiveRAGSystem) LoadInitialKnowledge(ctx context.Context) error {
 	log.Println("\n=== 加载初始知识库 ===")
-	
+
 	// 准备示例文档
 	documents := []*schema.Document{
 		{
@@ -581,10 +592,12 @@ func (s *ComprehensiveRAGSystem) LoadInitialKnowledge(ctx context.Context) error
 			},
 		},
 	}
-	
+
 	// 分割并索引文档
 	allChunks := make([]*schema.Document, 0)
+	// 遍历每个文档进行分割
 	for _, doc := range documents {
+		// 分割文档
 		chunks, err := s.transformer.Transform(ctx, []*schema.Document{doc})
 		if err != nil {
 			return fmt.Errorf("分割文档 %s 失败: %v", doc.ID, err)
@@ -592,18 +605,18 @@ func (s *ComprehensiveRAGSystem) LoadInitialKnowledge(ctx context.Context) error
 		allChunks = append(allChunks, chunks...)
 		log.Printf("文档 %s 分割为 %d 块", doc.ID, len(chunks))
 	}
-	
+
 	// 存储到向量数据库
 	storedIDs, err := s.indexer.Store(ctx, allChunks)
 	if err != nil {
 		return fmt.Errorf("存储文档失败: %v", err)
 	}
-	
+
 	// 加载集合到内存
 	if err := s.milvusClient.LoadCollection(ctx, s.config.MilvusCollection, false); err != nil {
 		return fmt.Errorf("加载集合失败: %v", err)
 	}
-	
+
 	log.Printf("✓ 成功加载 %d 个文档块到知识库", len(storedIDs))
 	return nil
 }
@@ -611,55 +624,55 @@ func (s *ComprehensiveRAGSystem) LoadInitialKnowledge(ctx context.Context) error
 // ProcessUserQuery 处理用户查询(演示核心功能)
 func (s *ComprehensiveRAGSystem) ProcessUserQuery(ctx context.Context, query string) error {
 	log.Printf("\n=== 处理用户查询: %s ===", query)
-	
+
 	// 1. 知识检索演示
 	log.Println("\n1. 执行知识检索...")
 	docs, err := s.retriever.Retrieve(ctx, query)
 	if err != nil {
 		return fmt.Errorf("知识检索失败: %v", err)
 	}
-	
+
 	log.Printf("检索到 %d 个相关知识片段:", len(docs))
 	for i, doc := range docs {
 		log.Printf("  [%d] ID: %s", i+1, doc.ID)
 		log.Printf("      内容: %s", truncateString(doc.Content, 100))
 	}
-	
+
 	// 2. 工具调用演示
 	log.Println("\n2. 演示工具调用...")
-	
+
 	// 演示计算器工具
 	calcTool := &CalculatorTool{}
 	calcResult, err := calcTool.InvokableRun(ctx, `{"expression": "25 + 17"}`)
 	if err == nil {
 		log.Printf("计算器工具结果: %s", calcResult)
 	}
-	
+
 	// 演示天气工具
 	weatherTool := &WeatherTool{}
 	weatherResult, err := weatherTool.InvokableRun(ctx, `{"city": "北京"}`)
 	if err == nil {
 		log.Printf("天气工具结果: %s", truncateString(weatherResult, 150))
 	}
-	
+
 	// 3. 构建增强提示
 	log.Println("\n3. 构建增强提示并生成回答...")
-	
+
 	prompt := buildRAGPrompt(query, docs)
 	messages := []*schema.Message{
 		schema.SystemMessage("你是一个智能助手，能够基于提供的知识回答问题并调用工具。请根据上下文提供准确、有用的回答。"),
 		schema.UserMessage(prompt),
 	}
-	
+
 	// 4. 生成最终回答
 	response, err := s.chatModel.Generate(ctx, messages)
 	if err != nil {
 		return fmt.Errorf("生成回答失败: %v", err)
 	}
-	
+
 	log.Println("\n=== 最终回答 ===")
 	log.Println(response.Content)
-	
+
 	return nil
 }
 
@@ -677,16 +690,19 @@ func (s *ComprehensiveRAGSystem) Close() error {
 
 // loadConfig 加载配置
 func loadConfig() (*Config, error) {
+	// 使用 Viper 加载配置文件
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./")
 	viper.AddConfigPath("../")
 	viper.AutomaticEnv()
-	
+
+	// 设置环境变量前缀
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Println("未找到 config.yaml 文件，将从环境变量读取配置。")
 	}
-	
+
+	// 读取文件或环境变量中的配置
 	config := &Config{
 		MilvusAddress:    viper.GetString("MILVUS_ADDRESS"),
 		MilvusCollection: viper.GetString("MILVUS_COLLECTION"),
@@ -694,7 +710,8 @@ func loadConfig() (*Config, error) {
 		EmbedderModel:    viper.GetString("EMBEDDER_MODEL"),
 		ArkModel:         viper.GetString("ARK_MODEL"),
 	}
-	
+
+	// 验证配置
 	return config, validateConfig(config)
 }
 
@@ -721,21 +738,21 @@ func validateConfig(config *Config) error {
 // buildRAGPrompt 构建RAG提示
 func buildRAGPrompt(query string, docs []*schema.Document) string {
 	prompt := "请基于以下知识库信息回答问题。\n\n=== 知识库信息 ===\n"
-	
+
 	for i, doc := range docs {
 		prompt += fmt.Sprintf("[知识片段 %d]\n%s\n\n", i+1, doc.Content)
 	}
-	
+
 	prompt += fmt.Sprintf("=== 用户问题 ===\n%s\n\n", query)
 	prompt += "请结合上述知识信息，提供准确、详细的回答。如果知识信息不足，请说明情况。"
-	
+
 	return prompt
 }
 
 // evaluateSimpleExpression 简单表达式计算
 func evaluateSimpleExpression(expr string) float64 {
 	expr = strings.ReplaceAll(expr, " ", "")
-	
+
 	if strings.Contains(expr, "+") {
 		parts := strings.Split(expr, "+")
 		if len(parts) == 2 {
@@ -745,7 +762,7 @@ func evaluateSimpleExpression(expr string) float64 {
 			return a + b
 		}
 	}
-	
+
 	if strings.Contains(expr, "-") {
 		parts := strings.Split(expr, "-")
 		if len(parts) == 2 {
@@ -755,7 +772,7 @@ func evaluateSimpleExpression(expr string) float64 {
 			return a - b
 		}
 	}
-	
+
 	var result float64
 	fmt.Sscanf(expr, "%f", &result)
 	return result
@@ -775,48 +792,50 @@ func truncateString(s string, maxLen int) string {
 
 func main() {
 	log.Println("🚀 启动 Eino 综合演示系统")
-	
+
 	// 加载配置
 	config, err := loadConfig()
 	if err != nil {
 		log.Fatalf("❌ 配置加载失败: %v", err)
 	}
-	
+
 	ctx := context.Background()
-	
-	// 创建系统实例
+
+	// 创建系统实例，初始化各个组件
 	system, err := NewComprehensiveRAGSystem(ctx, config)
 	if err != nil {
 		log.Fatalf("❌ 系统初始化失败: %v", err)
 	}
 	defer system.Close()
-	
+
 	log.Println("✅ 综合RAG系统初始化完成")
-	
+
 	// 加载初始知识库
 	if err := system.LoadInitialKnowledge(ctx); err != nil {
 		log.Fatalf("❌ 知识库加载失败: %v", err)
 	}
-	
+
 	// 演示查询处理
 	queries := []string{
 		"什么是 Eino 框架？",
 		"RAG 技术有什么优势？",
 		"如何使用工具系统？",
 	}
-	
+
+	// 遍历查询列表，依次处理每个查询
 	for i, query := range queries {
 		log.Printf("\n" + strings.Repeat("=", 60))
 		log.Printf("演示查询 %d/%d", i+1, len(queries))
-		
+
+		// 处理用户查询
 		if err := system.ProcessUserQuery(ctx, query); err != nil {
 			log.Printf("❌ 处理查询失败: %v", err)
 		}
-		
+
 		// 为演示添加延迟
 		time.Sleep(2 * time.Second)
 	}
-	
+
 	log.Println("\n" + strings.Repeat("=", 60))
 	log.Println("🎉 综合演示完成！系统展示了以下核心功能：")
 	log.Println("   • 📝 文档转换与分割 (Transformer)")
