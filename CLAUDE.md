@@ -51,6 +51,8 @@
 - `LLM_and_RAG_Concepts.md` - LLM 和 RAG 概念
 - `MCP_Concepts.md` - MCP 概念
 - `Vector_Database_Concepts.md` - 向量数据库概念
+- `Eino_Components_Relationship.md` - 组件关系详解（智能图书馆比喻）
+- `Eino_Orchestration_Guide.md` - 编排系统详解（流水线比喻）
 - 各演示目录包含对应的 README.md 和说明文档
 
 ### 主要代码文件
@@ -59,9 +61,20 @@
 - `use_methods/` - 使用方法示例
 
 ## 最近活动记录
-- 2025-08-21: 用户询问 Claude 如何获取历史对话记录
-- 2025-08-21: 创建了此 CLAUDE.md 文件用于记录项目信息和会话历史
-- 2025-08-21: 完成项目整体结构分析，了解了 Eino 框架的完整生态
+- 2025-08-22: 用户询问 Claude 如何获取历史对话记录
+- 2025-08-22: 创建了此 CLAUDE.md 文件用于记录项目信息和会话历史
+- 2025-08-22: 完成项目整体结构分析，了解了 Eino 框架的完整生态
+- 2025-08-22: 创建了形象生动的组件关系说明文档 `Eino_Components_Relationship.md`
+  - 使用"智能图书馆"比喻解释各组件作用
+  - 包含完整的组件协作流程图
+  - 提供实际应用场景示例
+- 2025-08-22: 学习了 Eino 官方编排设计原则
+  - 类型对齐原则、设计理念、双引擎支持等
+- 2025-08-22: 创建了编排概念详解文档 `Eino_Orchestration_Guide.md`
+  - 以汽车流水线比喻编排概念
+  - 详细对比 Chain vs Graph 两种编排方式
+  - 包含丰富的 ASCII 图解和实际代码示例
+  - 涵盖最佳实践和性能优化建议
 
 ## 开发偏好
 - 平台：macOS (Darwin 24.6.0)
