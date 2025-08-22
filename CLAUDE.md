@@ -53,6 +53,8 @@
 - `Vector_Database_Concepts.md` - 向量数据库概念
 - `Eino_Components_Relationship.md` - 组件关系详解（智能图书馆比喻）
 - `Eino_Orchestration_Guide.md` - 编排系统详解（流水线比喻）
+- `Eino_Open_Source_Overview.md` - 开源框架全景解析（搭积木比喻）
+- `ByteDance_Eino_Practice.md` - 字节跳动实践案例（足球队比喻）
 - 各演示目录包含对应的 README.md 和说明文档
 
 ### 主要代码文件
@@ -75,6 +77,15 @@
   - 详细对比 Chain vs Graph 两种编排方式
   - 包含丰富的 ASCII 图解和实际代码示例
   - 涵盖最佳实践和性能优化建议
+- 2025-08-22: 创建了 Eino 开源框架全景解析文档 `Eino_Open_Source_Overview.md`
+  - 用"搭积木"比喻解释 Eino 的核心价值
+  - 详细对比 Eino vs LangChain vs 其他框架
+  - 包含完整的技术架构图和使用场景分析
+- 2025-08-22: 创建了字节跳动 Eino 实践案例解析文档 `ByteDance_Eino_Practice.md`
+  - 用"足球队"比喻阐述 Eino 开发理念
+  - 详解豆包、抖音等产品的实际应用案例
+  - 包含具体的性能数据和开发效率提升指标
+  - 提供完整的学习路径和最佳实践建议
 
 ## 开发偏好
 - 平台：macOS (Darwin 24.6.0)
