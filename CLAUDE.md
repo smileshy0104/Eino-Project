@@ -55,6 +55,7 @@
 - `Eino_Orchestration_Guide.md` - 编排系统详解（流水线比喻）
 - `Eino_Open_Source_Overview.md` - 开源框架全景解析（搭积木比喻）
 - `ByteDance_Eino_Practice.md` - 字节跳动实践案例（足球队比喻）
+- `AI_Programming_Assistant_Guide.md` - AI 辅助编程新手完全指南
 - 各演示目录包含对应的 README.md 和说明文档
 
 ### 主要代码文件
@@ -86,6 +87,12 @@
   - 详解豆包、抖音等产品的实际应用案例
   - 包含具体的性能数据和开发效率提升指标
   - 提供完整的学习路径和最佳实践建议
+- 2025-08-22: 创建了 AI 辅助编程完全新手指南 `AI_Programming_Assistant_Guide.md`
+  - 面向完全不懂 AI 的程序员的零基础教学
+  - 详解 LLM、RAG、MCP、Agent 等核心概念
+  - 包含大量实际代码示例和使用场景
+  - 提供完整的个人博客系统开发实战案例
+  - 涵盖从新手到专家的完整学习路径
 
 ## 开发偏好
 - 平台：macOS (Darwin 24.6.0)
