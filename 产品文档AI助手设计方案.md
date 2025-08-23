@@ -995,6 +995,972 @@ eino:
 
 ---
 
+## 🏗️ 详细系统设计
+
+### 26. 系统架构图
+
+#### 整体架构概览
+```
+                    🌐 Internet
+                         │
+                    ┌────▼────┐
+                    │  Nginx  │ (负载均衡 + SSL)
+                    │ Gateway │
+                    └────┬────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+   ┌────▼────┐     ┌────▼────┐     ┌────▼────┐
+   │API 服务1│     │API 服务2│     │API 服务3│
+   │:8080    │     │:8080    │     │:8080    │
+   └────┬────┘     └────┬────┘     └────┬────┘
+        │                │                │
+        └────────────────┼────────────────┘
+                         │
+            ┌────────────┴────────────┐
+            │                         │
+       ┌────▼────┐              ┌────▼────┐
+       │Webhook  │              │定时任务  │
+       │监听器   │              │调度器   │
+       │:8081    │              │Cron     │
+       └────┬────┘              └────┬────┘
+            │                        │
+    ┌───────┴────────────────────────┴───────┐
+    │             Eino 处理引擎               │
+    ├─────────────────┬─────────────────────┤
+    │ Document        │ Embedding           │
+    │ Processor       │ Generator           │
+    ├─────────────────┼─────────────────────┤
+    │ Content         │ Vector              │
+    │ Splitter        │ Indexer             │
+    └─────────────────┴─────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+   ┌────▼────┐     ┌────▼────┐     ┌────▼────┐
+   │ Milvus  │     │ MySQL   │     │ Redis   │
+   │向量数据库│     │元数据库  │     │缓存层   │
+   │:19530   │     │:3306    │     │:6379    │
+   └─────────┘     └─────────┘     └─────────┘
+                                        │
+                    ┌──────────────────┴──────────────────┐
+                    │                                     │
+               ┌────▼────┐                          ┌────▼────┐
+               │飞书API   │                          │OpenAI   │
+               │集成层    │                          │API      │
+               └─────────┘                          └─────────┘
+```
+
+#### 数据流架构
+```
+┌─────────────┐    HTTP/HTTPS    ┌─────────────┐
+│   前端应用   │◄────────────────▶│  API网关    │
+│ React/Vue   │                  │   Nginx     │
+└─────────────┘                  └──────┬──────┘
+                                        │
+                                        ▼
+                                ┌─────────────┐
+                                │  业务服务层  │
+                                │  Go Server  │
+                                └──────┬──────┘
+                                       │
+                    ┌──────────────────┼──────────────────┐
+                    │                  │                  │
+                    ▼                  ▼                  ▼
+            ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+            │  数据处理层  │    │   存储层    │    │  外部服务层  │
+            │ Eino Engine │    │MySQL/Milvus│    │飞书/OpenAI  │
+            └─────────────┘    └─────────────┘    └─────────────┘
+```
+
+### 27. 数据库Schema设计
+
+#### MySQL 元数据存储
+```sql
+-- 文档信息表
+CREATE TABLE documents (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    doc_token VARCHAR(64) NOT NULL UNIQUE COMMENT '飞书文档token',
+    doc_type ENUM('doc', 'sheet', 'bitable', 'wiki') NOT NULL COMMENT '文档类型',
+    title VARCHAR(512) NOT NULL COMMENT '文档标题',
+    url VARCHAR(1024) NOT NULL COMMENT '文档链接',
+    owner_id VARCHAR(64) NOT NULL COMMENT '文档所有者ID',
+    owner_name VARCHAR(128) NOT NULL COMMENT '文档所有者姓名',
+    folder_token VARCHAR(64) COMMENT '所属文件夹token',
+    content_hash VARCHAR(64) COMMENT '内容hash，用于检测变更',
+    word_count INT DEFAULT 0 COMMENT '文档字数',
+    chunk_count INT DEFAULT 0 COMMENT '分块数量',
+    status ENUM('active', 'deleted', 'processing', 'failed') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    synced_at TIMESTAMP NULL COMMENT '最后同步时间',
+    
+    INDEX idx_doc_token (doc_token),
+    INDEX idx_doc_type (doc_type),
+    INDEX idx_owner_id (owner_id),
+    INDEX idx_updated_at (updated_at),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文档基本信息表';
+
+-- 文档内容块表
+CREATE TABLE document_chunks (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    document_id BIGINT NOT NULL COMMENT '文档ID',
+    chunk_index INT NOT NULL COMMENT '块序号',
+    content TEXT NOT NULL COMMENT '文本内容',
+    content_type ENUM('text', 'table', 'image', 'code') DEFAULT 'text',
+    char_count INT NOT NULL DEFAULT 0,
+    vector_id VARCHAR(64) COMMENT 'Milvus中的向量ID',
+    metadata JSON COMMENT '额外元数据',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+    INDEX idx_document_id (document_id),
+    INDEX idx_vector_id (vector_id),
+    UNIQUE KEY uk_doc_chunk (document_id, chunk_index)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文档内容分块表';
+
+-- 用户表
+CREATE TABLE users (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    feishu_user_id VARCHAR(64) NOT NULL UNIQUE COMMENT '飞书用户ID',
+    name VARCHAR(128) NOT NULL COMMENT '用户姓名',
+    avatar_url VARCHAR(512) COMMENT '头像链接',
+    email VARCHAR(256) COMMENT '邮箱',
+    department VARCHAR(256) COMMENT '部门',
+    role ENUM('admin', 'user', 'guest') DEFAULT 'user',
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    last_login_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_feishu_user_id (feishu_user_id),
+    INDEX idx_email (email),
+    INDEX idx_role (role)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户信息表';
+
+-- 文档权限表
+CREATE TABLE document_permissions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    document_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    permission ENUM('owner', 'editor', 'viewer') NOT NULL,
+    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    granted_by BIGINT COMMENT '授权者ID',
+    
+    FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_doc_user (document_id, user_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_permission (permission)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文档权限表';
+
+-- 问答记录表
+CREATE TABLE qa_sessions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    session_id VARCHAR(64) NOT NULL COMMENT '会话ID',
+    user_id BIGINT NOT NULL,
+    question TEXT NOT NULL,
+    answer TEXT,
+    context_docs JSON COMMENT '参考的文档列表',
+    satisfaction_score TINYINT COMMENT '满意度评分 1-5',
+    response_time_ms INT COMMENT '响应时间(毫秒)',
+    model_used VARCHAR(64) COMMENT '使用的AI模型',
+    tokens_used INT COMMENT '消耗的token数',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    INDEX idx_session_id (session_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='问答记录表';
+
+-- 系统配置表
+CREATE TABLE system_configs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    config_key VARCHAR(128) NOT NULL UNIQUE,
+    config_value TEXT NOT NULL,
+    config_type ENUM('string', 'int', 'float', 'bool', 'json') DEFAULT 'string',
+    description VARCHAR(512),
+    updated_by BIGINT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_config_key (config_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
+
+-- 同步日志表
+CREATE TABLE sync_logs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    sync_type ENUM('full', 'incremental', 'single') NOT NULL,
+    document_id BIGINT COMMENT '单文档同步时的文档ID',
+    status ENUM('running', 'success', 'failed') NOT NULL,
+    total_docs INT DEFAULT 0,
+    processed_docs INT DEFAULT 0,
+    failed_docs INT DEFAULT 0,
+    error_message TEXT,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP NULL,
+    
+    INDEX idx_sync_type (sync_type),
+    INDEX idx_status (status),
+    INDEX idx_started_at (started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同步日志表';
+```
+
+#### Milvus 向量数据库Schema
+```go
+// Milvus Collection Schema
+type DocumentVector struct {
+    ID          int64     `milvus:"id,primary_key,auto_id"`           // 主键，自动生成
+    DocumentID  int64     `milvus:"document_id"`                      // 文档ID，对应MySQL
+    ChunkIndex  int32     `milvus:"chunk_index"`                      // 块索引
+    Vector      []float32 `milvus:"vector,dim:1536"`                 // 1536维向量
+    ContentHash string    `milvus:"content_hash,varchar:64"`         // 内容hash
+    DocType     string    `milvus:"doc_type,varchar:16"`             // 文档类型
+    UpdateTime  int64     `milvus:"update_time"`                     // 更新时间戳
+}
+
+// 创建Collection的参数
+CollectionSchema: {
+    Name: "feishu_docs",
+    Fields: [
+        {Name: "id", DataType: Int64, PrimaryKey: true, AutoID: true},
+        {Name: "document_id", DataType: Int64},
+        {Name: "chunk_index", DataType: Int32},
+        {Name: "vector", DataType: FloatVector, Dim: 1536},
+        {Name: "content_hash", DataType: VarChar, MaxLength: 64},
+        {Name: "doc_type", DataType: VarChar, MaxLength: 16},
+        {Name: "update_time", DataType: Int64},
+    ],
+    Indexes: [
+        {FieldName: "vector", IndexType: "IVF_FLAT", MetricType: "L2", Params: {"nlist": 1024}},
+        {FieldName: "document_id", IndexType: "STL_SORT"},
+        {FieldName: "doc_type", IndexType: "STL_SORT"},
+    ]
+}
+```
+
+### 28. API接口设计
+
+#### RESTful API规范
+```go
+// API Base URL: https://doc-ai.yourcompany.com/api/v1
+
+// 1. 认证相关接口
+type AuthAPI struct{}
+
+// POST /api/v1/auth/login - 用户登录
+type LoginRequest struct {
+    Code string `json:"code" binding:"required"` // 飞书授权码
+}
+
+type LoginResponse struct {
+    Token     string    `json:"token"`
+    ExpiresAt time.Time `json:"expires_at"`
+    User      UserInfo  `json:"user"`
+}
+
+// GET /api/v1/auth/profile - 获取用户信息
+type UserInfo struct {
+    ID         int64  `json:"id"`
+    Name       string `json:"name"`
+    Avatar     string `json:"avatar"`
+    Email      string `json:"email"`
+    Department string `json:"department"`
+    Role       string `json:"role"`
+}
+
+// 2. 文档相关接口
+type DocumentAPI struct{}
+
+// GET /api/v1/documents - 获取文档列表
+type GetDocumentsRequest struct {
+    Page     int    `form:"page,default=1"`
+    PageSize int    `form:"page_size,default=20"`
+    Type     string `form:"type"`        // 文档类型过滤
+    Owner    string `form:"owner"`       // 所有者过滤
+    Keyword  string `form:"keyword"`     // 关键词搜索
+    StartDate string `form:"start_date"` // 开始日期
+    EndDate   string `form:"end_date"`   // 结束日期
+}
+
+type GetDocumentsResponse struct {
+    Documents []DocumentInfo `json:"documents"`
+    Total     int64          `json:"total"`
+    Page      int            `json:"page"`
+    PageSize  int            `json:"page_size"`
+}
+
+type DocumentInfo struct {
+    ID          int64     `json:"id"`
+    DocToken    string    `json:"doc_token"`
+    Type        string    `json:"type"`
+    Title       string    `json:"title"`
+    URL         string    `json:"url"`
+    Owner       string    `json:"owner"`
+    WordCount   int       `json:"word_count"`
+    ChunkCount  int       `json:"chunk_count"`
+    Status      string    `json:"status"`
+    CreatedAt   time.Time `json:"created_at"`
+    UpdatedAt   time.Time `json:"updated_at"`
+    SyncedAt    *time.Time `json:"synced_at"`
+}
+
+// POST /api/v1/documents/sync - 手动同步文档
+type SyncDocumentsRequest struct {
+    DocTokens []string `json:"doc_tokens"` // 指定文档，空则全量同步
+    Force     bool     `json:"force"`      // 强制重新同步
+}
+
+type SyncDocumentsResponse struct {
+    TaskID string `json:"task_id"`
+    Status string `json:"status"`
+}
+
+// 3. 问答相关接口
+type QAAPI struct{}
+
+// POST /api/v1/qa/ask - 提问接口
+type AskRequest struct {
+    Question   string            `json:"question" binding:"required"`
+    SessionID  string            `json:"session_id"`
+    Context    map[string]interface{} `json:"context"`
+    Filters    map[string]interface{} `json:"filters"` // 文档类型、时间范围等过滤
+}
+
+type AskResponse struct {
+    Answer       string           `json:"answer"`
+    SessionID    string           `json:"session_id"`
+    Sources      []SourceDocument `json:"sources"`      // 参考文档
+    Confidence   float64          `json:"confidence"`   // 置信度
+    ResponseTime int              `json:"response_time"` // 响应时间ms
+    TokensUsed   int              `json:"tokens_used"`   // token消耗
+}
+
+type SourceDocument struct {
+    DocID     int64   `json:"doc_id"`
+    Title     string  `json:"title"`
+    URL       string  `json:"url"`
+    Excerpt   string  `json:"excerpt"`   // 相关片段
+    Score     float64 `json:"score"`     // 相关度分数
+    ChunkIndex int    `json:"chunk_index"`
+}
+
+// GET /api/v1/qa/sessions/{session_id}/history - 获取对话历史
+type GetHistoryResponse struct {
+    SessionID string    `json:"session_id"`
+    Messages  []Message `json:"messages"`
+}
+
+type Message struct {
+    Type      string    `json:"type"`      // "question" | "answer"
+    Content   string    `json:"content"`
+    Timestamp time.Time `json:"timestamp"`
+    Sources   []SourceDocument `json:"sources,omitempty"`
+}
+
+// POST /api/v1/qa/feedback - 反馈评价
+type FeedbackRequest struct {
+    SessionID string `json:"session_id" binding:"required"`
+    MessageID string `json:"message_id" binding:"required"`
+    Score     int    `json:"score" binding:"required,min=1,max=5"` // 1-5分
+    Comment   string `json:"comment"`
+}
+
+// 4. 统计分析接口
+type AnalyticsAPI struct{}
+
+// GET /api/v1/analytics/dashboard - 仪表板数据
+type DashboardResponse struct {
+    DocumentStats DocumentStats `json:"document_stats"`
+    QAStats       QAStats       `json:"qa_stats"`
+    UserStats     UserStats     `json:"user_stats"`
+    SyncStats     SyncStats     `json:"sync_stats"`
+}
+
+type DocumentStats struct {
+    TotalDocs     int64 `json:"total_docs"`
+    DocsToday     int64 `json:"docs_today"`
+    DocsThisWeek  int64 `json:"docs_this_week"`
+    DocsThisMonth int64 `json:"docs_this_month"`
+    TypeDistribution map[string]int64 `json:"type_distribution"`
+}
+
+type QAStats struct {
+    TotalQuestions int64   `json:"total_questions"`
+    QuestionsToday int64   `json:"questions_today"`
+    AvgResponseTime int    `json:"avg_response_time"`
+    AvgSatisfaction float64 `json:"avg_satisfaction"`
+    PopularQuestions []string `json:"popular_questions"`
+}
+
+// 5. 管理员接口
+type AdminAPI struct{}
+
+// GET /api/v1/admin/sync/logs - 获取同步日志
+type GetSyncLogsResponse struct {
+    Logs []SyncLog `json:"logs"`
+    Total int64    `json:"total"`
+}
+
+type SyncLog struct {
+    ID            int64     `json:"id"`
+    SyncType      string    `json:"sync_type"`
+    Status        string    `json:"status"`
+    TotalDocs     int       `json:"total_docs"`
+    ProcessedDocs int       `json:"processed_docs"`
+    FailedDocs    int       `json:"failed_docs"`
+    ErrorMessage  string    `json:"error_message,omitempty"`
+    StartedAt     time.Time `json:"started_at"`
+    CompletedAt   *time.Time `json:"completed_at"`
+}
+
+// POST /api/v1/admin/config - 更新系统配置
+type UpdateConfigRequest struct {
+    Configs map[string]interface{} `json:"configs"`
+}
+```
+
+### 29. 前端组件结构
+
+#### React/TypeScript 组件架构
+```typescript
+// 项目结构
+src/
+├── components/          // 通用组件
+│   ├── common/
+│   │   ├── Header.tsx
+│   │   ├── Sidebar.tsx
+│   │   ├── Loading.tsx
+│   │   ├── Toast.tsx
+│   │   └── ErrorBoundary.tsx
+│   ├── forms/
+│   │   ├── SearchBox.tsx
+│   │   ├── FilterPanel.tsx
+│   │   └── DateRangePicker.tsx
+│   └── charts/
+│       ├── DocumentChart.tsx
+│       └── UsageChart.tsx
+├── pages/               // 页面组件
+│   ├── Dashboard/
+│   │   ├── index.tsx
+│   │   ├── DocumentStats.tsx
+│   │   └── QAStats.tsx
+│   ├── Chat/
+│   │   ├── index.tsx
+│   │   ├── ChatWindow.tsx
+│   │   ├── MessageList.tsx
+│   │   ├── MessageItem.tsx
+│   │   ├── InputBox.tsx
+│   │   └── SourcePanel.tsx
+│   ├── Documents/
+│   │   ├── index.tsx
+│   │   ├── DocumentList.tsx
+│   │   ├── DocumentCard.tsx
+│   │   └── DocumentDetail.tsx
+│   └── Admin/
+│       ├── index.tsx
+│       ├── SyncManager.tsx
+│       ├── UserManager.tsx
+│       └── ConfigManager.tsx
+├── hooks/               // 自定义Hooks
+│   ├── useAuth.ts
+│   ├── useChat.ts
+│   ├── useDocuments.ts
+│   └── useWebSocket.ts
+├── services/            // API服务层
+│   ├── api.ts
+│   ├── auth.ts
+│   ├── chat.ts
+│   └── documents.ts
+├── store/               // 状态管理
+│   ├── index.ts
+│   ├── authSlice.ts
+│   ├── chatSlice.ts
+│   └── documentsSlice.ts
+├── types/               // 类型定义
+│   ├── api.ts
+│   ├── chat.ts
+│   └── document.ts
+├── utils/               // 工具函数
+│   ├── request.ts
+│   ├── format.ts
+│   └── constants.ts
+└── styles/              // 样式文件
+    ├── globals.css
+    ├── components.css
+    └── variables.css
+```
+
+#### 核心组件实现
+```typescript
+// 1. 主聊天组件
+interface ChatWindowProps {
+  sessionId?: string;
+  onNewSession: (sessionId: string) => void;
+}
+
+const ChatWindow: React.FC<ChatWindowProps> = ({ sessionId, onNewSession }) => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { sendMessage, history } = useChat(sessionId);
+
+  const handleSendMessage = async (question: string) => {
+    setIsLoading(true);
+    try {
+      const response = await sendMessage(question);
+      setMessages(prev => [...prev, 
+        { type: 'question', content: question, timestamp: new Date() },
+        { type: 'answer', content: response.answer, sources: response.sources, timestamp: new Date() }
+      ]);
+    } catch (error) {
+      // 错误处理
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="chat-window">
+      <MessageList messages={messages} />
+      <InputBox onSend={handleSendMessage} disabled={isLoading} />
+      {isLoading && <Loading />}
+    </div>
+  );
+};
+
+// 2. 消息列表组件
+const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => {
+  return (
+    <div className="message-list">
+      {messages.map((message, index) => (
+        <MessageItem 
+          key={index} 
+          message={message}
+          showSources={message.type === 'answer'}
+        />
+      ))}
+    </div>
+  );
+};
+
+// 3. 文档搜索组件
+const DocumentSearch: React.FC = () => {
+  const [filters, setFilters] = useState<DocumentFilters>({});
+  const { documents, loading, searchDocuments } = useDocuments();
+
+  return (
+    <div className="document-search">
+      <SearchBox onSearch={searchDocuments} />
+      <FilterPanel filters={filters} onChange={setFilters} />
+      <DocumentList documents={documents} loading={loading} />
+    </div>
+  );
+};
+
+// 4. 仪表板组件
+const Dashboard: React.FC = () => {
+  const { stats, loading } = useDashboardStats();
+
+  if (loading) return <Loading />;
+
+  return (
+    <div className="dashboard">
+      <div className="stats-grid">
+        <DocumentStats stats={stats.documentStats} />
+        <QAStats stats={stats.qaStats} />
+        <UserStats stats={stats.userStats} />
+        <SyncStats stats={stats.syncStats} />
+      </div>
+      <div className="charts-section">
+        <DocumentChart data={stats.documentTrends} />
+        <UsageChart data={stats.usageTrends} />
+      </div>
+    </div>
+  );
+};
+
+// 5. 自定义Hooks
+const useChat = (sessionId?: string) => {
+  const [history, setHistory] = useState<Message[]>([]);
+  
+  const sendMessage = async (question: string) => {
+    const response = await fetch('/api/v1/qa/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, session_id: sessionId })
+    });
+    return response.json();
+  };
+
+  const loadHistory = async () => {
+    if (sessionId) {
+      const response = await fetch(`/api/v1/qa/sessions/${sessionId}/history`);
+      const data = await response.json();
+      setHistory(data.messages);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+  }, [sessionId]);
+
+  return { sendMessage, history, loadHistory };
+};
+```
+
+### 30. 部署架构
+
+#### 容器化部署方案
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Nginx 网关
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - api-server
+      - web-app
+    networks:
+      - feishu-network
+
+  # API服务 (多实例)
+  api-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    environment:
+      - GO_ENV=production
+      - MYSQL_HOST=mysql
+      - REDIS_HOST=redis
+      - MILVUS_HOST=milvus-standalone
+    volumes:
+      - ./configs:/app/configs
+      - ./logs:/app/logs
+    depends_on:
+      - mysql
+      - redis
+      - milvus-standalone
+    deploy:
+      replicas: 3
+    networks:
+      - feishu-network
+
+  # Web前端
+  web-app:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_BASE_URL=https://doc-ai.yourcompany.com/api
+    networks:
+      - feishu-network
+
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=feishu_doc_ai
+      - MYSQL_USER=app_user
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "3306:3306"
+    networks:
+      - feishu-network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - feishu-network
+
+  # Milvus向量数据库
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.0
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+    volumes:
+      - etcd-data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - feishu-network
+
+  minio:
+    container_name: milvus-minio
+    image: minio/minio:RELEASE.2022-03-17T06-34-49Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - minio-data:/data
+    command: minio server /data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - feishu-network
+
+  milvus-standalone:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.3.1
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvus-data:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - "etcd"
+      - "minio"
+    networks:
+      - feishu-network
+
+  # 监控服务
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - feishu-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning
+    networks:
+      - feishu-network
+
+volumes:
+  mysql-data:
+  redis-data:
+  milvus-data:
+  etcd-data:
+  minio-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  feishu-network:
+    driver: bridge
+```
+
+#### Kubernetes部署配置
+```yaml
+# k8s/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: feishu-doc-ai
+
+---
+# k8s/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: feishu-doc-ai
+data:
+  config.yaml: |
+    app:
+      name: "飞书文档AI助手"
+      port: 8080
+    feishu:
+      app_id: "${FEISHU_APP_ID}"
+      app_secret: "${FEISHU_APP_SECRET}"
+    # ... 其他配置
+
+---
+# k8s/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+  namespace: feishu-doc-ai
+type: Opaque
+data:
+  mysql-password: <base64-encoded-password>
+  redis-password: <base64-encoded-password>
+  openai-api-key: <base64-encoded-key>
+
+---
+# k8s/api-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+  namespace: feishu-doc-ai
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-server
+  template:
+    metadata:
+      labels:
+        app: api-server
+    spec:
+      containers:
+      - name: api-server
+        image: feishu-doc-ai/api-server:latest
+        ports:
+        - containerPort: 8080
+        - containerPort: 8081  # webhook port
+        env:
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: mysql-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: redis-password
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/configs
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi" 
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config-volume
+        configMap:
+          name: app-config
+
+---
+# k8s/api-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-server-service
+  namespace: feishu-doc-ai
+spec:
+  selector:
+    app: api-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+  - name: webhook
+    port: 8081
+    targetPort: 8081
+  type: ClusterIP
+
+---
+# k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  namespace: feishu-doc-ai
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - doc-ai.yourcompany.com
+    secretName: app-tls
+  rules:
+  - host: doc-ai.yourcompany.com
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: api-server-service
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-app-service
+            port:
+              number: 80
+
+---
+# k8s/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-server-hpa
+  namespace: feishu-doc-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-server
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+```
+
 ## 🚀 部署方案
 
 ### 基础设施需求
