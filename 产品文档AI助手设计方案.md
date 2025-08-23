@@ -2874,6 +2874,117 @@ bot_permissions:
 - API调用日志脱敏处理
 - 实现数据备份和恢复机制
 
+### 飞书API详细信息与文档
+
+#### 📚 核心API列表与文档链接
+
+**1. 认证相关API**
+
+| API名称 | 接口地址 | 官方文档 | 用途 |
+|---------|----------|----------|------|
+| 获取tenant_access_token | `POST /open-apis/auth/v3/tenant_access_token/internal` | [文档链接](https://open.feishu.cn/document/server-docs/authentication-management/access-token/tenant_access_token_internal) | 获取应用级别access_token |
+| 获取user_access_token | `POST /open-apis/authen/v1/access_token` | [文档链接](https://open.feishu.cn/document/server-docs/authentication-management/access-token/create) | OAuth用户授权后获取用户token |
+
+**2. 云文档相关API**
+
+| API名称 | 接口地址 | 官方文档 | 用途 |
+|---------|----------|----------|------|
+| 获取文件夹下的清单 | `GET /open-apis/drive/v1/files` | [文档链接](https://open.feishu.cn/document/server-docs/docs/drive-v1/file/list) | 获取指定文件夹下的所有文件 |
+| 获取文件元信息 | `GET /open-apis/drive/v1/metas/batch_query` | [文档链接](https://open.feishu.cn/document/server-docs/docs/drive-v1/meta/batch_query) | 批量获取文件的详细信息 |
+| 获取文档原始内容 | `GET /open-apis/docx/v1/documents/{document_id}/raw_content` | [文档链接](https://open.feishu.cn/document/server-docs/docs/docs/docx-v1/document-docx/raw_content) | 获取飞书文档的纯文本内容 |
+| 获取表格数据 | `GET /open-apis/sheets/v3/spreadsheets/{spreadsheet_token}/values/{range}` | [文档链接](https://open.feishu.cn/document/server-docs/docs/sheets-v3/data-operation/reading-spreadsheet-data) | 获取表格指定范围的数据 |
+| 获取多维表格信息 | `GET /open-apis/bitable/v1/apps/{app_token}/tables` | [文档链接](https://open.feishu.cn/document/server-docs/docs/bitable-v1/app-table/list) | 获取多维表格的表信息 |
+| 获取知识库节点 | `GET /open-apis/wiki/v2/spaces/{space_id}/nodes` | [文档链接](https://open.feishu.cn/document/server-docs/docs/wiki-v2/space-node/list) | 获取知识库的节点列表 |
+
+**3. 权限管理API**
+
+| API名称 | 接口地址 | 官方文档 | 用途 |
+|---------|----------|----------|------|
+| 获取文档权限成员 | `GET /open-apis/drive/v1/permissions/{token}/members` | [文档链接](https://open.feishu.cn/document/server-docs/docs/permission/permission-member/list) | 获取指定文档的权限成员列表 |
+| 增加权限成员 | `POST /open-apis/drive/v1/permissions/{token}/members` | [文档链接](https://open.feishu.cn/document/server-docs/docs/permission/permission-member/create) | 为文档添加权限成员 |
+
+**4. 通讯录API**
+
+| API名称 | 接口地址 | 官方文档 | 用途 |
+|---------|----------|----------|------|
+| 获取用户信息 | `GET /open-apis/contact/v3/users/{user_id}` | [文档链接](https://open.feishu.cn/document/server-docs/contact-v3/user/get) | 获取指定用户的详细信息 |
+| 获取部门信息 | `GET /open-apis/contact/v3/departments/{department_id}` | [文档链接](https://open.feishu.cn/document/server-docs/contact-v3/department/get) | 获取指定部门信息 |
+| 获取部门用户列表 | `GET /open-apis/contact/v3/users` | [文档链接](https://open.feishu.cn/document/server-docs/contact-v3/user/find_by_department) | 获取部门下的用户列表 |
+
+**5. 机器人消息API**
+
+| API名称 | 接口地址 | 官方文档 | 用途 |
+|---------|----------|----------|------|
+| 发送消息 | `POST /open-apis/im/v1/messages` | [文档链接](https://open.feishu.cn/document/server-docs/im-v1/message/create) | 发送文本、卡片等消息 |
+| Webhook接收消息 | - | [文档链接](https://open.feishu.cn/document/server-docs/event-subscription-guide/event-subscription-configure-/request-url-configuration-case) | 接收用户消息和系统事件 |
+
+**6. 事件订阅API**
+
+| 事件类型 | 事件名称 | 官方文档 | 用途 |
+|---------|----------|----------|------|
+| 文档创建 | `drive.file.created_in_folder_v1` | [文档链接](https://open.feishu.cn/document/server-docs/docs/drive-v1/event/file-created) | 文件夹内文档创建事件 |
+| 文档编辑 | `drive.file.edit_v1` | [文档链接](https://open.feishu.cn/document/server-docs/docs/drive-v1/event/file-edited) | 文档内容编辑事件 |
+| 标题更新 | `drive.file.title_updated_v1` | [文档链接](https://open.feishu.cn/document/server-docs/docs/drive-v1/event/file-title-updated) | 文档标题更新事件 |
+| 文档删除 | `drive.file.trashed_v1` | [文档链接](https://open.feishu.cn/document/server-docs/docs/drive-v1/event/file-trashed) | 文档删除事件 |
+
+#### 🔗 重要文档链接汇总
+
+**官方开发者中心：**
+- 主站：https://open.feishu.cn/
+- 开发文档：https://open.feishu.cn/document/
+- API Explorer：https://open.feishu.cn/api-explorer/
+
+**权限申请指南：**
+- 权限管理文档：https://open.feishu.cn/document/server-docs/authentication-management/permission-list
+- OAuth 2.0流程：https://open.feishu.cn/document/server-docs/authentication-management/login-state-management/web-application-login
+
+**SDK和工具：**
+- Go SDK：https://github.com/larksuite/oapi-sdk-go
+- API调试工具：https://open.feishu.cn/api-explorer/
+- Webhook验证工具：https://open.feishu.cn/document/server-docs/event-subscription-guide/event-subscription-configure-/encrypt-key-authentication-case
+
+#### 🛠️ 快速集成代码示例
+
+**Go语言集成示例：**
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    
+    lark "github.com/larksuite/oapi-sdk-go/v3"
+    larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
+    larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
+)
+
+func main() {
+    // 创建Client
+    client := lark.NewClient("your-app-id", "your-app-secret")
+    
+    // 获取文件列表
+    req := larkdrive.NewListFileReq()
+    req.FolderToken = larkcore.StringPtr("your-folder-token")
+    req.PageSize = larkcore.Int64Ptr(50)
+    
+    resp, err := client.Drive.File.List(context.Background(), req)
+    if err != nil {
+        fmt.Printf("调用失败: %v\n", err)
+        return
+    }
+    
+    // 处理响应
+    if !resp.Success() {
+        fmt.Printf("API调用失败: %v\n", resp.Msg)
+        return
+    }
+    
+    for _, file := range resp.Data.Files {
+        fmt.Printf("文件名: %s, Token: %s\n", *file.Name, *file.Token)
+    }
+}
+```
+
 ### 飞书应用创建步骤
 
 **Step 1: 创建飞书企业应用**
@@ -2888,18 +2999,55 @@ bot_permissions:
 **Step 2: 配置权限范围**
 ```bash
 1. 进入"权限管理"页面
-2. 按照上述权限清单申请权限
+2. 按照上述权限清单申请权限：
+   - 云文档权限组：drive:drive, docs:doc, sheets:spreadsheet, wiki:wiki, bitable:app
+   - 通讯录权限组：contact:user.base:readonly, contact:department.base:readonly  
+   - 机器人权限组：im:message, im:message.group_at_msg
 3. 提交审核（通常需要1-3个工作日）
 4. 获得管理员批准后生效
 ```
 
-**Step 3: 获取应用凭证**
+**Step 3: 配置事件订阅**
+```bash
+1. 进入"事件订阅"页面
+2. 配置请求网址：https://your-domain.com/webhook/feishu
+3. 添加事件：
+   - drive.file.created_in_folder_v1 (文档创建)
+   - drive.file.edit_v1 (文档编辑)
+   - drive.file.title_updated_v1 (标题更新)
+   - drive.file.trashed_v1 (文档删除)
+4. 验证请求网址有效性
+```
+
+**Step 4: 获取应用凭证**
 ```bash
 1. 记录 App ID 和 App Secret
-2. 配置服务器回调地址
-3. 设置事件订阅Webhook
+2. 记录 Encrypt Key 和 Verification Token
+3. 配置OAuth重定向URI：https://your-domain.com/auth/callback
 4. 测试API调用是否正常
 ```
+
+#### 💡 API使用注意事项
+
+**1. 频率限制**
+- 大部分API限制：100次/分钟/应用
+- 文档内容获取：50次/分钟/应用
+- 建议实现请求重试和指数退避机制
+
+**2. Token管理**
+- `tenant_access_token` 有效期2小时，需要定期刷新
+- `user_access_token` 根据授权范围有不同有效期
+- 建议实现Token缓存和自动刷新机制
+
+**3. 错误处理**
+- 所有API都返回标准的错误码和错误信息
+- 常见错误码：99991663(权限不足)、99991400(参数错误)
+- 建议实现详细的错误日志记录
+
+**4. 数据格式**
+- 时间格式统一使用Unix时间戳
+- 文档Token是文档的唯一标识符
+- 用户ID使用飞书的open_id或user_id
 
 ---
 
