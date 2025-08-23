@@ -91,7 +91,7 @@ database:
 
 ```bash
 # 可选：通过环境变量设置API密钥
-export AI_DOC_AI_API_KEY="your-api-key"
+export AI_DOC_AI_API_KEY="d0666bb8-8a41-42f4-bd06-94ca6ba08457"
 export AI_DOC_SERVER_PORT=8080
 ```
 

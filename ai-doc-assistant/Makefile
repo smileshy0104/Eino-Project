@@ -6,11 +6,52 @@
 # 默认目标
 .DEFAULT_GOAL := help
 
+# 检测操作系统
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+
+# 操作系统相关变量
+ifeq ($(OS),Windows_NT)
+	DETECTED_OS := windows
+	BINARY_EXTENSION := .exe
+	PATH_SEPARATOR := \\
+	SHELL_OPEN := start
+	NULL_DEVICE := nul
+else
+	DETECTED_OS := $(shell echo $(UNAME_S) | tr '[:upper:]' '[:lower:]')
+	BINARY_EXTENSION :=
+	PATH_SEPARATOR := /
+	NULL_DEVICE := /dev/null
+	ifeq ($(DETECTED_OS),darwin)
+		SHELL_OPEN := open
+	else
+		SHELL_OPEN := xdg-open
+	endif
+endif
+
+# 架构检测
+ifeq ($(UNAME_M),x86_64)
+	ARCH := amd64
+endif
+ifeq ($(UNAME_M),arm64)
+	ARCH := arm64
+endif
+ifeq ($(UNAME_M),aarch64)
+	ARCH := arm64
+endif
+ifndef ARCH
+	ARCH := amd64
+endif
+
 # 项目变量
 APP_NAME = ai-doc-assistant
 VERSION = 1.0.0
-BUILD_TIME = $(shell date +%Y%m%d_%H%M%S)
-GIT_COMMIT = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+ifeq ($(OS),Windows_NT)
+	BUILD_TIME = $(shell powershell -Command "Get-Date -Format 'yyyyMMdd_HHmmss'")
+else
+	BUILD_TIME = $(shell date +%Y%m%d_%H%M%S)
+endif
+GIT_COMMIT = $(shell git rev-parse --short HEAD 2>$(NULL_DEVICE) || echo "unknown")
 BUILD_FLAGS = -ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X main.gitCommit=$(GIT_COMMIT)"
 
 # Go相关变量
@@ -20,9 +61,9 @@ GOCLEAN = $(GOCMD) clean
 GOTEST = $(GOCMD) test
 GOGET = $(GOCMD) get
 GOMOD = $(GOCMD) mod
-BINARY_NAME = $(APP_NAME)
-BINARY_PATH = bin/$(BINARY_NAME)
-MAIN_FILE = cmd/server/main.go
+BINARY_NAME = $(APP_NAME)$(BINARY_EXTENSION)
+BINARY_PATH = bin$(PATH_SEPARATOR)$(BINARY_NAME)
+MAIN_FILE = cmd$(PATH_SEPARATOR)server$(PATH_SEPARATOR)main.go
 
 # Docker相关变量
 DOCKER_IMAGE = $(APP_NAME):$(VERSION)
@@ -36,11 +77,12 @@ NC = \033[0m # No Color
 
 ## help: 显示帮助信息
 help:
-	@echo "AI文档助手 - 可用命令:"
+	@echo "AI文档助手 - 可用命令 [$(DETECTED_OS)-$(ARCH)]:"
 	@echo
 	@echo "  $(GREEN)开发命令:$(NC)"
 	@echo "    dev        - 开发模式启动 (热重载)"
 	@echo "    build      - 构建应用程序"
+	@echo "    build-all  - 构建所有平台版本"
 	@echo "    test       - 运行测试"
 	@echo "    clean      - 清理构建文件"
 	@echo
@@ -59,6 +101,7 @@ help:
 	@echo "    deps       - 安装/更新依赖"
 	@echo "    format     - 格式化代码"
 	@echo "    lint       - 代码检查"
+	@echo "    sysinfo    - 显示系统信息"
 	@echo
 
 ## dev: 开发模式启动
@@ -74,10 +117,34 @@ dev:
 
 ## build: 构建应用程序
 build:
-	@echo "$(GREEN)构建应用程序...$(NC)"
+	@echo "$(GREEN)构建应用程序 [$(DETECTED_OS)-$(ARCH)]...$(NC)"
+ifeq ($(OS),Windows_NT)
+	@if not exist bin mkdir bin
+else
 	@mkdir -p bin
-	@$(GOBUILD) $(BUILD_FLAGS) -o $(BINARY_PATH) $(MAIN_FILE)
+endif
+	@GOOS=$(DETECTED_OS) GOARCH=$(ARCH) $(GOBUILD) $(BUILD_FLAGS) -o $(BINARY_PATH) $(MAIN_FILE)
 	@echo "$(GREEN)✅ 构建完成: $(BINARY_PATH)$(NC)"
+
+## build-all: 构建所有平台版本
+build-all:
+	@echo "$(GREEN)构建所有平台版本...$(NC)"
+ifeq ($(OS),Windows_NT)
+	@if not exist bin mkdir bin
+else
+	@mkdir -p bin
+endif
+	@echo "$(YELLOW)构建 Linux AMD64...$(NC)"
+	@GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o bin/$(APP_NAME)-linux-amd64 $(MAIN_FILE)
+	@echo "$(YELLOW)构建 Linux ARM64...$(NC)"
+	@GOOS=linux GOARCH=arm64 $(GOBUILD) $(BUILD_FLAGS) -o bin/$(APP_NAME)-linux-arm64 $(MAIN_FILE)
+	@echo "$(YELLOW)构建 macOS AMD64...$(NC)"
+	@GOOS=darwin GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o bin/$(APP_NAME)-darwin-amd64 $(MAIN_FILE)
+	@echo "$(YELLOW)构建 macOS ARM64...$(NC)"
+	@GOOS=darwin GOARCH=arm64 $(GOBUILD) $(BUILD_FLAGS) -o bin/$(APP_NAME)-darwin-arm64 $(MAIN_FILE)
+	@echo "$(YELLOW)构建 Windows AMD64...$(NC)"
+	@GOOS=windows GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) -o bin/$(APP_NAME)-windows-amd64.exe $(MAIN_FILE)
+	@echo "$(GREEN)✅ 所有平台构建完成$(NC)"
 
 ## test: 运行测试
 test:
@@ -95,16 +162,35 @@ test-cover:
 clean:
 	@echo "$(GREEN)清理构建文件...$(NC)"
 	@$(GOCLEAN)
+ifeq ($(OS),Windows_NT)
+	@if exist bin rmdir /s /q bin
+	@if exist logs\*.log del /q logs\*.log
+	@if exist coverage.out del coverage.out
+	@if exist coverage.html del coverage.html
+else
 	@rm -rf bin/
-	@rm -rf logs/*.log
+	@rm -rf logs/*.log 2>$(NULL_DEVICE) || true
 	@rm -f coverage.out coverage.html
+endif
 	@echo "$(GREEN)✅ 清理完成$(NC)"
 
 ## install: 一键部署
 install:
 	@echo "$(GREEN)开始一键部署...$(NC)"
-	@chmod +x scripts/setup.sh
-	@./scripts/setup.sh
+ifeq ($(OS),Windows_NT)
+	@if exist scripts\setup.bat ( \
+		scripts\setup.bat \
+	) else ( \
+		echo "$(YELLOW)Windows安装脚本不存在，请手动运行docker-compose up -d$(NC)" \
+	)
+else
+	@if [ -f scripts/setup.sh ]; then \
+		chmod +x scripts/setup.sh; \
+		./scripts/setup.sh; \
+	else \
+		echo "$(YELLOW)安装脚本不存在，请手动运行docker-compose up -d$(NC)"; \
+	fi
+endif
 
 ## start: 启动所有服务
 start:
@@ -118,14 +204,22 @@ start:
 stop:
 	@echo "$(GREEN)停止所有服务...$(NC)"
 	@$(DOCKER_COMPOSE) down
+ifeq ($(OS),Windows_NT)
+	@if exist .app.pid ( \
+		for /f %%i in (.app.pid) do taskkill /PID %%i /F >nul 2>&1 && \
+		echo $(GREEN)✅ 应用进程已停止 (PID: %%i)$(NC) && \
+		del .app.pid \
+	)
+else
 	@if [ -f .app.pid ]; then \
 		PID=$$(cat .app.pid); \
-		if ps -p $$PID > /dev/null; then \
+		if ps -p $$PID > $(NULL_DEVICE); then \
 			kill $$PID; \
 			echo "$(GREEN)✅ 应用进程已停止 (PID: $$PID)$(NC)"; \
 		fi; \
 		rm -f .app.pid; \
 	fi
+endif
 
 ## restart: 重启所有服务
 restart: stop start
@@ -133,11 +227,19 @@ restart: stop start
 ## logs: 查看应用日志
 logs:
 	@echo "$(GREEN)显示应用日志...$(NC)"
+ifeq ($(OS),Windows_NT)
+	@if exist logs\app.log ( \
+		powershell -Command "Get-Content logs\app.log -Wait" \
+	) else ( \
+		echo "$(YELLOW)日志文件不存在: logs\app.log$(NC)" \
+	)
+else
 	@if [ -f logs/app.log ]; then \
 		tail -f logs/app.log; \
 	else \
 		echo "$(YELLOW)日志文件不存在: logs/app.log$(NC)"; \
 	fi
+endif
 
 ## logs-docker: 查看Docker服务日志
 logs-docker:
@@ -152,9 +254,22 @@ status:
 	@$(DOCKER_COMPOSE) ps
 	@echo
 	@echo "$(YELLOW)应用服务状态:$(NC)"
+ifeq ($(OS),Windows_NT)
+	@if exist .app.pid ( \
+		for /f %%i in (.app.pid) do ( \
+			tasklist /FI "PID eq %%i" 2>nul | findstr /R /C:"%%i" >nul && ( \
+				echo ✅ 应用服务运行中 (PID: %%i) \
+			) || ( \
+				echo ❌ 应用服务未运行 \
+			) \
+		) \
+	) else ( \
+		echo ❌ 应用服务未启动 \
+	)
+else
 	@if [ -f .app.pid ]; then \
 		PID=$$(cat .app.pid); \
-		if ps -p $$PID > /dev/null; then \
+		if ps -p $$PID > $(NULL_DEVICE); then \
 			echo "✅ 应用服务运行中 (PID: $$PID)"; \
 		else \
 			echo "❌ 应用服务未运行"; \
@@ -162,6 +277,7 @@ status:
 	else \
 		echo "❌ 应用服务未启动"; \
 	fi
+endif
 
 ## health: 健康检查
 health:
@@ -271,12 +387,45 @@ update-deps:
 	@$(GOMOD) tidy
 	@echo "$(GREEN)✅ 依赖更新完成$(NC)"
 
-## info: 显示项目信息
-info:
-	@echo "$(GREEN)项目信息:$(NC)"
+## sysinfo: 显示系统信息
+sysinfo:
+	@echo "$(GREEN)系统信息:$(NC)"
+	@echo "  操作系统: $(DETECTED_OS)"
+	@echo "  架构: $(ARCH)"
 	@echo "  应用名称: $(APP_NAME)"
 	@echo "  版本号: $(VERSION)"
 	@echo "  构建时间: $(BUILD_TIME)"
 	@echo "  Git提交: $(GIT_COMMIT)"
 	@echo "  Go版本: $(shell $(GOCMD) version)"
-	@echo "  Docker版本: $(shell docker --version 2>/dev/null || echo '未安装')"
+	@echo "  Docker版本: $(shell docker --version 2>$(NULL_DEVICE) || echo '未安装')"
+
+## open-browser: 打开浏览器
+open-browser:
+	@echo "$(GREEN)打开浏览器...$(NC)"
+	@$(SHELL_OPEN) http://localhost:8080
+
+## run-native: 本地运行(不使用Docker)
+run-native: build
+	@echo "$(GREEN)本地运行应用...$(NC)"
+ifeq ($(OS),Windows_NT)
+	@start /B $(BINARY_PATH) > logs\app.log 2>&1 & echo !PID! > .app.pid
+else
+	@nohup ./$(BINARY_PATH) > logs/app.log 2>&1 & echo $$! > .app.pid
+endif
+	@echo "$(GREEN)✅ 应用已启动$(NC)"
+	@make status
+
+## package: 打包发布版本
+package: build-all
+	@echo "$(GREEN)打包发布版本...$(NC)"
+ifeq ($(OS),Windows_NT)
+	@if not exist release mkdir release
+else
+	@mkdir -p release
+endif
+ifeq ($(OS),Windows_NT)
+	@powershell -Command "Compress-Archive -Path bin\* -DestinationPath release\$(APP_NAME)-$(VERSION)-all-platforms.zip -Force"
+else
+	@tar -czf release/$(APP_NAME)-$(VERSION)-all-platforms.tar.gz -C bin .
+endif
+	@echo "$(GREEN)✅ 发布包已生成$(NC)"

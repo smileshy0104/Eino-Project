@@ -40,11 +40,32 @@ check_requirements() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         OS="macos"
         log_info "检测到 macOS 系统"
+        # 检查是否为Apple Silicon
+        if [[ $(uname -m) == "arm64" ]]; then
+            ARCH="arm64"
+            log_info "检测到 Apple Silicon (ARM64) 架构"
+        else
+            ARCH="amd64"
+            log_info "检测到 Intel (AMD64) 架构"
+        fi
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         OS="linux"
         log_info "检测到 Linux 系统"
+        case $(uname -m) in
+            x86_64) ARCH="amd64" ;;
+            aarch64) ARCH="arm64" ;;
+            armv7l) ARCH="arm" ;;
+            *) ARCH="amd64" ;;
+        esac
+        log_info "检测到 $ARCH 架构"
+    elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+        OS="windows"
+        ARCH="amd64"
+        log_info "检测到 Windows 系统 (Git Bash/Cygwin)"
+        log_warn "建议使用 scripts/setup.bat 脚本"
     else
         log_error "不支持的操作系统: $OSTYPE"
+        log_info "支持的系统: macOS, Linux, Windows"
         exit 1
     fi
     

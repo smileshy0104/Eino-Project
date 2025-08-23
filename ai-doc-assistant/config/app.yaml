@@ -10,7 +10,7 @@ database:
   # MySQL配置
   mysql:
     host: "localhost"
-    port: 3306
+    port: 3307
     username: "ai_user"
     password: "ai_password"
     database: "ai_assistant"
@@ -29,7 +29,7 @@ database:
   # Redis配置
   redis:
     host: "localhost"
-    port: 6379
+    port: 6380
     password: ""
     db: 0
     pool_size: 10
