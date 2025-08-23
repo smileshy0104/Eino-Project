@@ -163,7 +163,179 @@ RAG-AI：根据您的代码规范文档，我看到您要求：
 - 企业内部开发规范
 - 特定领域的技术文档
 
-### 2.3 🔧 MCP (Model Context Protocol) - AI 工具的万能接口
+### 2.3 🤖 AI Agent (智能体) - 会自主工作的 AI 助手
+
+**是什么？**
+AI Agent 就像一个非常聪明的实习生，不仅能听懂你的要求，还能自己制定计划、使用工具、完成复杂的任务，甚至遇到问题时会主动想办法解决。
+
+**普通 AI vs AI Agent 对比：**
+
+**普通 AI（被动回答）：**
+```
+你：帮我搭建一个博客网站
+AI：好的，你需要以下几个步骤：
+    1. 选择技术栈...
+    2. 创建项目结构...
+    3. 安装依赖...
+    [只能给建议，无法实际操作]
+```
+
+**AI Agent（主动完成）：**
+```
+你：帮我搭建一个博客网站
+Agent：好的！我来帮你完成整个项目：
+
+🔍 正在分析需求...
+📋 制定开发计划：React + Node.js + MongoDB
+📁 正在创建项目结构...
+⚙️ 正在安装依赖包...
+💻 正在生成核心代码...
+🎨 正在设置基础样式...
+🧪 正在运行测试...
+🚀 正在启动开发服务器...
+
+✅ 完成！你的博客网站已经运行在 http://localhost:3000
+   登录后台：http://localhost:3000/admin
+   
+需要我添加其他功能吗？比如评论系统、SEO优化？
+```
+
+**🏗️ Agent 的核心能力：**
+
+1. **自主规划**：能够分解复杂任务，制定执行步骤
+2. **工具使用**：会主动调用各种工具（编译器、测试框架、部署工具等）
+3. **问题解决**：遇到错误会自动分析并尝试修复
+4. **持续改进**：根据结果反馈优化后续行为
+
+**🎯 编程中的 Agent 应用场景：**
+
+**代码重构 Agent：**
+```
+Agent 工作流程：
+1. 扫描整个项目代码
+2. 识别重复代码和坏味道
+3. 生成重构建议
+4. 自动执行安全的重构操作
+5. 运行测试验证没有破坏功能
+6. 生成重构报告
+```
+
+**自动化测试 Agent：**
+```
+Agent 工作流程：
+1. 分析新增的代码
+2. 自动生成对应的测试用例
+3. 运行所有相关测试
+4. 发现失败的测试并分析原因
+5. 修复代码或更新测试
+6. 生成测试覆盖率报告
+```
+
+**部署运维 Agent：**
+```
+Agent 工作流程：
+1. 监控应用性能和错误
+2. 自动扩容或缩容资源
+3. 发现问题时自动回滚
+4. 生成运维报告和建议
+5. 预测性维护提醒
+```
+
+**🔧 如何构建自己的编程 Agent？**
+
+**使用 Eino 框架：**
+```python
+# 创建一个代码审查 Agent
+review_agent = Chain()
+    .add(DocumentRetriever(knowledge_base="coding_standards"))
+    .add(CodeAnalyzer())
+    .add(IssueDetector())
+    .add(SuggestionGenerator())
+    .add(ReportWriter())
+
+# Agent 自主工作
+result = review_agent.invoke({
+    "code_path": "./src",
+    "standards": "company_guidelines"
+})
+```
+
+**Agent 的优势：**
+- ⚡ **24/7 工作**：永不疲倦的编程伙伴
+- 🎯 **一致性**：每次都按照最佳实践执行
+- 📈 **学习能力**：从每次任务中积累经验
+- 🔧 **工具整合**：无缝使用各种开发工具
+
+**💡 实际案例：自动化代码审查 Agent**
+
+```python
+# 使用 Eino 构建一个完整的代码审查 Agent
+from eino import Chain, Tools
+from eino.chat_models import ChatModel
+from eino.retrievers import VectorRetriever
+from eino.transformers import CodeAnalyzer
+
+# 1. 创建知识库检索器
+code_standards_retriever = VectorRetriever(
+    knowledge_base="company_coding_standards"
+)
+
+# 2. 创建代码分析工具
+code_analyzer = Tools.create("code_analyzer", {
+    "analyze_complexity": "检查代码复杂度",
+    "check_security": "安全漏洞检查", 
+    "validate_naming": "命名规范检查",
+    "detect_duplicates": "重复代码检测"
+})
+
+# 3. 创建 AI 模型
+reviewer_model = ChatModel(
+    model="claude-3.5-sonnet",
+    system_prompt="你是一个专业的代码审查专家，请基于公司规范提供详细的审查意见。"
+)
+
+# 4. 构建 Agent 工作流
+code_review_agent = Chain()
+    .add(code_analyzer)  # 静态分析
+    .add(code_standards_retriever)  # 检索相关规范
+    .add(reviewer_model)  # AI 审查
+    .add(Tools.create("report_generator"))  # 生成报告
+
+# 5. Agent 开始工作
+review_result = code_review_agent.invoke({
+    "code_path": "./src/user_service.py",
+    "review_type": "comprehensive"
+})
+
+# 输出结果示例：
+"""
+🔍 代码审查报告 - user_service.py
+
+✅ 优点：
+- 代码结构清晰，遵循单一职责原则
+- 异常处理完善
+- 文档注释规范
+
+⚠️ 需要改进：
+- 第45行：函数复杂度过高(15)，建议拆分
+- 第78行：SQL查询存在注入风险，建议使用参数化查询
+- 第92行：变量命名 'usr_data' 不符合规范，建议改为 'user_data'
+
+🔧 自动修复建议：
+已生成修复版本：./src/user_service_fixed.py
+请review后替换原文件。
+
+📊 质量评分：7.5/10
+"""
+```
+
+这个 Agent 不仅能发现问题，还能：
+- 自动运行各种检查工具
+- 查找相关的编码规范
+- 生成详细的改进建议
+- 甚至可以自动修复简单的问题
+
+### 2.4 🔧 MCP (Model Context Protocol) - AI 工具的万能接口
 
 **是什么？**
 MCP 是一个开放标准，让 AI 模型能够安全地连接和使用各种外部工具和数据源。简单来说，它让 AI 从"只能聊天"变成"能实际干活"！
