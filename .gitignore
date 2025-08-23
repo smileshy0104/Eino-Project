@@ -1,2 +1,10 @@
 # 忽略配置文件
 config.yaml
+ai-doc-assistant/go.mod
+ai-doc-assistant/README.md
+ai-doc-assistant/cmd/server/main.go
+ai-doc-assistant/internal/config/config.go
+ai-doc-assistant/internal/model/document.go
+ai-doc-assistant/internal/repository/database.go
+ai-doc-assistant/internal/service/qa_service.go
+ai-doc-assistant/pkg/eino/client.go
