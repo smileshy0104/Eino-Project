@@ -32,14 +32,14 @@ type DatabaseConfig struct {
 
 // MySQLConfig MySQL配置
 type MySQLConfig struct {
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
-	Database string `mapstructure:"database"`
-	Charset  string `mapstructure:"charset"`
-	MaxIdleConns int `mapstructure:"max_idle_conns"`
-	MaxOpenConns int `mapstructure:"max_open_conns"`
+	Host         string `mapstructure:"host"`
+	Port         int    `mapstructure:"port"`
+	Username     string `mapstructure:"username"`
+	Password     string `mapstructure:"password"`
+	Database     string `mapstructure:"database"`
+	Charset      string `mapstructure:"charset"`
+	MaxIdleConns int    `mapstructure:"max_idle_conns"`
+	MaxOpenConns int    `mapstructure:"max_open_conns"`
 }
 
 // MilvusConfig Milvus配置
@@ -62,9 +62,9 @@ type RedisConfig struct {
 
 // AIConfig AI服务配置
 type AIConfig struct {
-	Provider string      `mapstructure:"provider"` // volcengine, openai
-	APIKey   string      `mapstructure:"api_key"`
-	BaseURL  string      `mapstructure:"base_url"`
+	Provider string       `mapstructure:"provider"` // volcengine, openai
+	APIKey   string       `mapstructure:"api_key"`
+	BaseURL  string       `mapstructure:"base_url"`
 	Models   ModelsConfig `mapstructure:"models"`
 }
 
@@ -76,10 +76,10 @@ type ModelsConfig struct {
 
 // StorageConfig 存储配置
 type StorageConfig struct {
-	Type     string      `mapstructure:"type"` // local, oss, s3
-	Local    LocalStorage `mapstructure:"local"`
-	MaxFileSize string   `mapstructure:"max_file_size"`
-	AllowedExts []string `mapstructure:"allowed_extensions"`
+	Type        string       `mapstructure:"type"` // local, oss, s3
+	Local       LocalStorage `mapstructure:"local"`
+	MaxFileSize string       `mapstructure:"max_file_size"`
+	AllowedExts []string     `mapstructure:"allowed_extensions"`
 }
 
 // LocalStorage 本地存储配置
@@ -104,7 +104,14 @@ type FeishuConfig struct {
 
 // Load 加载配置
 func Load() (*Config, error) {
-	viper.SetConfigName("app")
+	// 检查环境变量或本地配置文件
+	configName := "app"
+	if _, err := os.Stat("./config/app.yaml"); err == nil {
+		configName = "app"
+		fmt.Println("🏠 使用本地开发配置: app.yaml")
+	}
+
+	viper.SetConfigName(configName)
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./config")
 	viper.AddConfigPath(".")
