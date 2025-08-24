@@ -70,3 +70,52 @@
 | **Agent** | **自主规划、决策、反思** | **复杂的、多步骤的、需要自主决策的任务** | **能独立完成项目的实习生** |
 
 **Agent** 的出现，标志着我们与 AI 的交互方式从简单的“一问一答”模式，向着更高级的“**目标驱动**”模式演进。你不再需要告诉 AI 每一步该怎么做，而只需要告诉它**“你想要什么”**，剩下的规划和执行过程，都由 Agent 自主完成。
+
+
+如果意外关闭对话框，您可以通过以下方式快速恢复上下文：
+
+  📋 快速上下文恢复方法
+
+  1. 查看项目上下文文件
+
+  cd /Users/yuyansong/AiProject/Eino/ai-doc-assistant
+  cat CONTEXT.md
+  这个文件包含了完整的项目状态、技术配置和当前进展。
+
+  2. 检查系统当前状态
+
+  make sysinfo          # 显示系统和项目信息
+  make status           # 检查服务运行状态
+  docker ps             # 查看运行中的容器
+
+  3. 快速功能验证
+
+  ./bin/demo            # 运行演示程序验证功能
+  make health           # 健康检查所有组件
+
+  4. 告诉新的Claude助手这些关键信息：
+
+  "我在开发一个基于Eino框架的AI文档助手项目，位于 
+  /Users/yuyansong/AiProject/Eino/ai-doc-assistant。请先读取 CONTEXT.md 
+  文件了解项目当前状态，然后运行 make sysinfo 查看系统信息。项目已经完成了从简化版到真正Eino
+  v0.4.4框架的重构，API密钥已配置，所有核心功能都在正常运行。"
+
+  5. 项目关键状态速览
+
+  - ✅ Eino框架: v0.4.4 完全集成
+  - ✅ API配置: 火山方舟密钥已设置
+  - ✅ 数据库: Milvus向量数据库正常运行
+  - ✅ 功能验证: 文档处理和AI问答都正常
+  - ✅ 跨平台: 支持 macOS/Linux/Windows
+
+  6. 重要文件位置
+
+  - 项目上下文: CONTEXT.md
+  - 配置文件: config/app.yaml
+  - 演示程序: bin/demo
+  - 构建脚本: Makefile
+  - 服务配置: docker-compose.yml
+
+  这样新的Claude助手就能立即了解项目的完整状态，无需重新解释整个开发过程！
+
+  提示: CONTEXT.md 文件会记录所有重要的技术决策、配置信息和当前状态，是恢复上下文的最佳入口点。
