@@ -3,23 +3,22 @@ services:
   ai-doc-assistant:
     build:
       context: .
-      dockerfile: docker/Dockerfile.simple
+      dockerfile: docker/Dockerfile.linux
     container_name: ai-doc-assistant-app
     ports:
-      - '8080:8080'
+      - '8082:8080'
     environment:
       - AI_DOC_SERVER_PORT=8080
       - AI_DOC_SERVER_MODE=debug
-      # 复用现有服务的主机端口连接
-      - AI_DOC_DATABASE_MILVUS_HOST=host.docker.internal
+      # 使用容器名连接所有服务
+      - AI_DOC_DATABASE_MILVUS_HOST=milvus-standalone
       - AI_DOC_DATABASE_MILVUS_PORT=19530
-      - AI_DOC_DATABASE_MILVUS_DATABASE=ai_assistant
-      - AI_DOC_DATABASE_MYSQL_HOST=host.docker.internal
-      - AI_DOC_DATABASE_MYSQL_PORT=3309
+      - AI_DOC_DATABASE_MYSQL_HOST=mysql8
+      - AI_DOC_DATABASE_MYSQL_PORT=3306
       - AI_DOC_DATABASE_MYSQL_USERNAME=root
       - AI_DOC_DATABASE_MYSQL_PASSWORD=123456
-      - AI_DOC_DATABASE_MYSQL_DATABASE=ai_assistant
-      - AI_DOC_DATABASE_REDIS_HOST=host.docker.internal
+      - AI_DOC_DATABASE_MYSQL_DATABASE=msproject
+      - AI_DOC_DATABASE_REDIS_HOST=redis6
       - AI_DOC_DATABASE_REDIS_PORT=6379
       # API密钥
       - AI_DOC_AI_API_KEY=d0666bb8-8a41-42f4-bd06-94ca6ba08457
@@ -28,10 +27,10 @@ services:
       - ./logs:/app/logs
       - ./config:/app/config
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    networks:
+      - eino_default
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health']
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/']
       interval: 30s
       timeout: 20s
       retries: 3
@@ -48,5 +47,10 @@ services:
     depends_on:
       - ai-doc-assistant
     restart: unless-stopped
+    networks:
+      - eino_default
 
-# 不需要额外的volumes和networks - 复用现有环境
+networks:
+  eino_default:
+    external: true
+    name: eino_default

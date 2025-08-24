@@ -9,11 +9,11 @@ server:
 database:
   # MySQL配置 (适配现有环境)
   mysql:
-    host: "mysql"  # Docker容器内使用服务名
-    port: 3309
+    host: "mysql8"  # MySQL容器名
+    port: 3306      # 容器内端口
     username: "root"
     password: "123456"
-    database: "ai_assistant"
+    database: "msproject"
     charset: "utf8mb4"
     max_idle_conns: 10
     max_open_conns: 100
@@ -28,7 +28,7 @@ database:
 
   # Redis配置 (适配现有环境)
   redis:
-    host: "redis"  # Docker容器内使用服务名
+    host: "redis6"  # Redis容器名
     port: 6379
     password: ""
     db: 0
