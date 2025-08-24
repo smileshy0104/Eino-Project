@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/google/uuid"
 
 	// Eino 框架核心组件
 	"github.com/cloudwego/eino/components/document"
@@ -24,6 +27,7 @@ import (
 
 	"ai-doc-assistant/internal/config"
 	"ai-doc-assistant/internal/model"
+	"ai-doc-assistant/internal/repository"
 )
 
 // Document 简化的文档结构（用于演示）
@@ -48,6 +52,7 @@ type EinoService struct {
 	transformer  document.Transformer
 	chatModel    *ark.ChatModel
 	tools        []tool.BaseTool
+	database     *repository.Database
 	initialized  bool
 }
 
@@ -93,6 +98,60 @@ func NewEinoService(cfg *config.Config) (*EinoService, error) {
 	}
 
 	return service, nil
+}
+
+// SetDatabase 设置数据库连接
+func (s *EinoService) SetDatabase(db *repository.Database) {
+	s.database = db
+}
+
+// QueryKnowledgeWithHistory 问答并保存历史记录
+func (s *EinoService) QueryKnowledgeWithHistory(ctx context.Context, req *model.QueryRequest) (*model.QueryResponse, error) {
+	// 执行问答
+	response, err := s.QueryKnowledge(ctx, req.Question)
+	if err != nil {
+		return nil, err
+	}
+
+	// 保存历史记录（如果有数据库连接）
+	if s.database != nil {
+		retrievedDocsJSON, _ := json.Marshal(response.Sources)
+		
+		history := &model.QueryHistory{
+			ID:            response.QueryID,
+			UserID:        req.UserID,
+			Query:         req.Question,
+			Response:      response.Answer,
+			ResponseTimeMs: response.ResponseTime,
+			RetrievedDocs: string(retrievedDocsJSON),
+			CreatedAt:    time.Now(),
+		}
+		
+		// 异步保存，不影响响应速度
+		go func() {
+			if err := s.database.SaveQueryHistory(history); err != nil {
+				log.Printf("保存查询历史失败: %v", err)
+			}
+		}()
+	}
+
+	return response, nil
+}
+
+// GetQueryHistory 获取查询历史
+func (s *EinoService) GetQueryHistory(userID string, limit int) ([]model.QueryHistory, error) {
+	if s.database == nil {
+		return nil, fmt.Errorf("数据库未初始化")
+	}
+	return s.database.GetQueryHistoryByUserID(userID, limit)
+}
+
+// UpdateQueryFeedback 更新查询反馈
+func (s *EinoService) UpdateQueryFeedback(queryID string, satisfactionScore int, feedback string) error {
+	if s.database == nil {
+		return fmt.Errorf("数据库未初始化")
+	}
+	return s.database.UpdateQueryFeedback(queryID, satisfactionScore, feedback)
 }
 
 // initialize 初始化所有Eino组件
@@ -342,11 +401,13 @@ func (s *EinoService) QueryKnowledge(ctx context.Context, question string) (*mod
 	// 4. 构建响应
 	responseTime := int(time.Since(startTime).Milliseconds())
 	sources := s.convertDocsToSources(docs)
+	queryID := uuid.New().String()
 
 	return &model.QueryResponse{
 		Answer:       response.Content,
 		Sources:      sources,
 		ResponseTime: responseTime,
+		QueryID:      queryID,
 		Confidence:   s.calculateConfidence(docs),
 	}, nil
 }

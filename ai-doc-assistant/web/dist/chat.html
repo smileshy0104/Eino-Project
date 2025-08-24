@@ -40,12 +40,53 @@
 
         .container {
             flex: 1;
-            max-width: 1000px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 2rem;
             display: flex;
+            gap: 1rem;
+        }
+
+        .main-content {
+            flex: 2;
+            display: flex;
             flex-direction: column;
             gap: 1rem;
+        }
+
+        .sidebar {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            min-width: 320px;
+        }
+
+        .sidebar-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-content {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .sidebar-content.collapsed {
+            display: none;
         }
 
         .chat-container {
@@ -289,8 +330,9 @@
     </div>
 
     <div class="container">
-        <div class="chat-container">
-            <div class="messages" id="messages">
+        <div class="main-content">
+            <div class="chat-container">
+                <div class="messages" id="messages">
                 <div class="welcome">
                     <h3>👋 欢迎使用AI文档助手</h3>
                     <p>我可以帮您快速查找文档信息，回答各种问题。请在下方输入您的问题开始对话。</p>
@@ -320,6 +362,60 @@
                 <button class="send-btn" id="sendBtn" onclick="sendMessage()">
                     <span>→</span>
                 </button>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <!-- 查询历史 -->
+            <div class="sidebar-section">
+                <div class="sidebar-header" onclick="toggleSection('history')">
+                    📜 查询历史
+                    <span id="history-toggle">▼</span>
+                </div>
+                <div class="sidebar-content" id="history-content">
+                    <div class="loading-history" id="loadingHistory" style="display: none; padding: 1rem; text-align: center; color: #666;">
+                        加载中...
+                    </div>
+                    <div class="history-list" id="historyList">
+                        <div class="empty-history" style="padding: 1rem; text-align: center; color: #999;">
+                            暂无查询历史
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 反馈提交 -->
+            <div class="sidebar-section">
+                <div class="sidebar-header" onclick="toggleSection('feedback')">
+                    📝 反馈建议
+                    <span id="feedback-toggle">▼</span>
+                </div>
+                <div class="sidebar-content" id="feedback-content">
+                    <div class="feedback-form" style="padding: 1rem;">
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: bold; color: #333;">查询ID:</label>
+                            <input type="text" id="feedbackQueryId" placeholder="输入要反馈的查询ID" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: bold; color: #333;">满意度评分:</label>
+                            <select id="satisfactionScore" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="">请选择满意度</option>
+                                <option value="1">1 - 非常不满意</option>
+                                <option value="2">2 - 不满意</option>
+                                <option value="3">3 - 一般</option>
+                                <option value="4">4 - 满意</option>
+                                <option value="5">5 - 非常满意</option>
+                            </select>
+                        </div>
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: bold; color: #333;">详细反馈:</label>
+                            <textarea id="feedbackText" placeholder="请输入您的反馈建议..." style="width: 100%; height: 80px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; resize: vertical;"></textarea>
+                        </div>
+                        <button onclick="submitFeedback()" style="width: 100%; padding: 0.8rem; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            提交反馈
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -382,11 +478,15 @@
 
                 const data = await response.json();
                 
-                // 添加AI回答
+                // 添加AI回答（包含查询ID）
                 addMessage('assistant', data.answer, data.sources, {
                     responseTime: data.response_time_ms,
-                    confidence: data.confidence
+                    confidence: data.confidence,
+                    queryId: data.query_id
                 });
+
+                // 刷新查询历史
+                setTimeout(loadQueryHistory, 500);
 
             } catch (error) {
                 console.error('Error:', error);
@@ -402,7 +502,143 @@
             sendMessage();
         }
 
-        // 添加消息
+        // 添加消息（删除重复的addMessage函数）
+
+        // 添加错误消息
+        function addErrorMessage(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.innerHTML = `❌ ${message}`;
+            messagesContainer.appendChild(errorDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 设置加载状态
+        function setLoading(isLoading) {
+            loading.style.display = isLoading ? 'block' : 'none';
+            sendBtn.disabled = isLoading;
+            
+            if (isLoading) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }
+
+        // 侧边栏功能
+        function toggleSection(section) {
+            const content = document.getElementById(section + '-content');
+            const toggle = document.getElementById(section + '-toggle');
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                toggle.textContent = '▼';
+            } else {
+                content.classList.add('collapsed');
+                toggle.textContent = '▶';
+            }
+        }
+
+        // 加载查询历史
+        async function loadQueryHistory() {
+            const loadingHistory = document.getElementById('loadingHistory');
+            const historyList = document.getElementById('historyList');
+            
+            loadingHistory.style.display = 'block';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/qa/history?user_id=anonymous&limit=20`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                loadingHistory.style.display = 'none';
+                
+                if (data.data && data.data.length > 0) {
+                    historyList.innerHTML = '';
+                    
+                    data.data.forEach(item => {
+                        const historyItem = document.createElement('div');
+                        historyItem.className = 'history-item';
+                        historyItem.style.cssText = `
+                            padding: 0.8rem;
+                            border-bottom: 1px solid #eee;
+                            cursor: pointer;
+                        `;
+                        
+                        const query = item.query.length > 50 ? item.query.substring(0, 50) + '...' : item.query;
+                        const time = new Date(item.created_at).toLocaleString('zh-CN');
+                        
+                        historyItem.innerHTML = `
+                            <div style="font-size: 0.85rem; color: #333; margin-bottom: 0.3rem;">${query}</div>
+                            <div style="font-size: 0.7rem; color: #666;">${time}</div>
+                            <div style="font-size: 0.7rem; color: #999; font-family: monospace;">ID: ${item.id.substring(0, 8)}</div>
+                        `;
+                        
+                        historyItem.onclick = function() {
+                            questionInput.value = item.query;
+                            document.getElementById('feedbackQueryId').value = item.id;
+                        };
+                        
+                        historyList.appendChild(historyItem);
+                    });
+                } else {
+                    historyList.innerHTML = '<div style="padding: 1rem; text-align: center; color: #999;">暂无查询历史</div>';
+                }
+            } catch (error) {
+                loadingHistory.style.display = 'none';
+                historyList.innerHTML = `<div style="padding: 1rem; text-align: center; color: #e74c3c;">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        // 提交反馈
+        async function submitFeedback() {
+            const queryId = document.getElementById('feedbackQueryId').value.trim();
+            const satisfactionScore = document.getElementById('satisfactionScore').value;
+            const feedback = document.getElementById('feedbackText').value.trim();
+            
+            if (!queryId) {
+                alert('请输入查询ID');
+                return;
+            }
+            
+            if (!satisfactionScore) {
+                alert('请选择满意度评分');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/qa/feedback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query_id: queryId,
+                        satisfaction_score: parseInt(satisfactionScore),
+                        feedback: feedback
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                alert('反馈提交成功！感谢您的宝贵意见。');
+                
+                // 清空表单
+                document.getElementById('feedbackQueryId').value = '';
+                document.getElementById('satisfactionScore').value = '';
+                document.getElementById('feedbackText').value = '';
+                
+            } catch (error) {
+                alert(`反馈提交失败: ${error.message}`);
+            }
+        }
+
+        // 添加查询ID显示功能
         function addMessage(role, content, sources, meta) {
             // 隐藏欢迎界面
             const welcome = document.querySelector('.welcome');
@@ -417,11 +653,24 @@
 
             messageDiv.appendChild(contentDiv);
 
-            // 添加元信息
+            // 添加元信息（包含查询ID）
             if (meta) {
                 const metaDiv = document.createElement('div');
                 metaDiv.className = 'message-meta';
-                metaDiv.innerHTML = `响应时间: ${meta.responseTime}ms | 置信度: ${(meta.confidence * 100).toFixed(1)}%`;
+                let metaText = `响应时间: ${meta.responseTime}ms`;
+                
+                if (meta.confidence !== undefined) {
+                    metaText += ` | 置信度: ${(meta.confidence * 100).toFixed(1)}%`;
+                }
+                
+                // 如果有查询ID，显示它
+                if (meta.queryId) {
+                    metaText += ` | 查询ID: ${meta.queryId.substring(0, 8)}`;
+                    // 自动填充到反馈表单
+                    document.getElementById('feedbackQueryId').value = meta.queryId;
+                }
+                
+                metaDiv.innerHTML = metaText;
                 messageDiv.appendChild(metaDiv);
             }
 
@@ -459,28 +708,10 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        // 添加错误消息
-        function addErrorMessage(message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error';
-            errorDiv.innerHTML = `❌ ${message}`;
-            messagesContainer.appendChild(errorDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        // 设置加载状态
-        function setLoading(isLoading) {
-            loading.style.display = isLoading ? 'block' : 'none';
-            sendBtn.disabled = isLoading;
-            
-            if (isLoading) {
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            }
-        }
-
-        // 页面加载完成后设置焦点
+        // 页面加载完成后设置焦点并加载历史
         document.addEventListener('DOMContentLoaded', function() {
             questionInput.focus();
+            loadQueryHistory();
         });
     </script>
 </body>

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -84,11 +85,14 @@ func (h *Handlers) AskQuestion(c *gin.Context) {
 	if req.TopK == 0 {
 		req.TopK = 5
 	}
+	if req.UserID == "" {
+		req.UserID = "anonymous" // 匿名用户
+	}
 
 	ctx := c.Request.Context()
 	
-	// 调用Eino服务进行问答
-	response, err := h.einoService.QueryKnowledge(ctx, req.Question)
+	// 调用Eino服务进行问答并保存历史
+	response, err := h.einoService.QueryKnowledgeWithHistory(ctx, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "查询失败",
@@ -101,11 +105,55 @@ func (h *Handlers) AskQuestion(c *gin.Context) {
 }
 
 func (h *Handlers) QueryHistory(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented"})
+	userID := c.Query("user_id")
+	if userID == "" {
+		userID = "anonymous"
+	}
+	
+	limit := 20 // 默认返回最近20条
+	if limitParam := c.Query("limit"); limitParam != "" {
+		if parsedLimit, err := strconv.Atoi(limitParam); err == nil && parsedLimit > 0 && parsedLimit <= 100 {
+			limit = parsedLimit
+		}
+	}
+
+	histories, err := h.einoService.GetQueryHistory(userID, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "获取查询历史失败",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": histories,
+		"count": len(histories),
+	})
 }
 
 func (h *Handlers) SubmitFeedback(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented"})
+	var req model.FeedbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "无效的请求参数",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	err := h.einoService.UpdateQueryFeedback(req.QueryID, req.SatisfactionScore, req.Feedback)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "提交反馈失败",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "反馈提交成功",
+	})
 }
 
 func (h *Handlers) CreateUser(c *gin.Context) {

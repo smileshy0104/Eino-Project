@@ -54,6 +54,9 @@ func main() {
 		zap.S().Fatalf("❌ Eino服务初始化失败: %v", err)
 	}
 	defer einoService.Close()
+	
+	// 设置数据库连接
+	einoService.SetDatabase(db)
 
 	// 5. 初始化Handler层
 	handlers := handler.NewHandlers(einoService)

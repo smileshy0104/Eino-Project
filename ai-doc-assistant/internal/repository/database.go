@@ -83,3 +83,74 @@ func (d *Database) HealthCheck() error {
 	}
 	return sqlDB.Ping()
 }
+
+// SaveQueryHistory 保存查询历史
+func (d *Database) SaveQueryHistory(history *model.QueryHistory) error {
+	// 确保用户存在，如果不存在则创建
+	var user model.User
+	err := d.DB.Where("id = ?", history.UserID).First(&user).Error
+	if err != nil {
+		// 用户不存在，创建一个基本用户记录
+		newUser := &model.User{
+			ID:       history.UserID,
+			Username: history.UserID, // 使用ID作为用户名
+			Role:     "user",
+			Status:   "active",
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		if err := d.DB.Create(newUser).Error; err != nil {
+			return fmt.Errorf("创建用户失败: %w", err)
+		}
+	}
+	
+	return d.DB.Create(history).Error
+}
+
+// GetQueryHistoryByUserID 获取用户的查询历史
+func (d *Database) GetQueryHistoryByUserID(userID string, limit int) ([]model.QueryHistory, error) {
+	var histories []model.QueryHistory
+	query := d.DB.Where("user_id = ?", userID).Order("created_at DESC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	err := query.Find(&histories).Error
+	return histories, err
+}
+
+// GetAllQueryHistory 获取所有查询历史（分页）
+func (d *Database) GetAllQueryHistory(page, pageSize int) ([]model.QueryHistory, int64, error) {
+	var histories []model.QueryHistory
+	var total int64
+	
+	// 计算总数
+	err := d.DB.Model(&model.QueryHistory{}).Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	
+	// 分页查询
+	offset := (page - 1) * pageSize
+	err = d.DB.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&histories).Error
+	return histories, total, err
+}
+
+// UpdateQueryFeedback 更新查询反馈
+func (d *Database) UpdateQueryFeedback(queryID string, satisfactionScore int, feedback string) error {
+	return d.DB.Model(&model.QueryHistory{}).
+		Where("id = ?", queryID).
+		Updates(map[string]interface{}{
+			"satisfaction_score": satisfactionScore,
+			"feedback":          feedback,
+		}).Error
+}
+
+// GetQueryHistoryByID 根据ID获取查询历史
+func (d *Database) GetQueryHistoryByID(queryID string) (*model.QueryHistory, error) {
+	var history model.QueryHistory
+	err := d.DB.Where("id = ?", queryID).First(&history).Error
+	if err != nil {
+		return nil, err
+	}
+	return &history, nil
+}
