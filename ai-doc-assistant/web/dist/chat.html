@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI文档助手 - 智能问答</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+        }
+
+        .container {
+            flex: 1;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .chat-container {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            max-height: 500px;
+            min-height: 300px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .message.user {
+            text-align: right;
+        }
+
+        .message.assistant {
+            text-align: left;
+        }
+
+        .message-content {
+            display: inline-block;
+            padding: 0.8rem 1.2rem;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: #667eea;
+            color: white;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+        }
+
+        .message-meta {
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 0.3rem;
+        }
+
+        .sources {
+            margin-top: 0.8rem;
+            padding-top: 0.8rem;
+            border-top: 1px solid #eee;
+        }
+
+        .sources-title {
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .source {
+            background: #f5f5f5;
+            border-left: 3px solid #667eea;
+            padding: 0.5rem;
+            margin-bottom: 0.3rem;
+            font-size: 0.8rem;
+            border-radius: 4px;
+        }
+
+        .source-title {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .source-content {
+            color: #666;
+            margin-top: 0.2rem;
+        }
+
+        .input-container {
+            padding: 1rem;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-end;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        #questionInput {
+            width: 100%;
+            min-height: 2.5rem;
+            max-height: 6rem;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            resize: none;
+            font-family: inherit;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #questionInput:focus {
+            border-color: #667eea;
+        }
+
+        .send-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 2.5rem;
+            height: 2.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: #5a6fd8;
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 1rem;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        .welcome {
+            text-align: center;
+            color: #666;
+            padding: 2rem;
+        }
+
+        .welcome h3 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .sample-questions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        .sample-question {
+            background: #f0f2ff;
+            color: #667eea;
+            border: 1px solid #667eea;
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .sample-question:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .error {
+            background: #ffe6e6;
+            border-left: 3px solid #ff4444;
+            padding: 0.8rem;
+            margin: 0.5rem;
+            border-radius: 4px;
+            color: #cc0000;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .header h1 {
+                font-size: 1.4rem;
+            }
+            
+            .message-content {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 AI文档助手</h1>
+        <p>基于Eino框架的智能文档问答系统 • 为您提供准确的文档信息检索</p>
+    </div>
+
+    <div class="container">
+        <div class="chat-container">
+            <div class="messages" id="messages">
+                <div class="welcome">
+                    <h3>👋 欢迎使用AI文档助手</h3>
+                    <p>我可以帮您快速查找文档信息，回答各种问题。请在下方输入您的问题开始对话。</p>
+                    <div class="sample-questions">
+                        <div class="sample-question" onclick="askQuestion('你好，请介绍一下你自己')">你好，请介绍一下你自己</div>
+                        <div class="sample-question" onclick="askQuestion('如何上传文档？')">如何上传文档？</div>
+                        <div class="sample-question" onclick="askQuestion('系统有哪些功能？')">系统有哪些功能？</div>
+                        <div class="sample-question" onclick="askQuestion('支持哪些文档格式？')">支持哪些文档格式？</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                正在思考中...
+            </div>
+
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="questionInput" 
+                        placeholder="请输入您的问题..." 
+                        rows="1"
+                        onkeydown="handleKeyDown(event)"
+                    ></textarea>
+                </div>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                    <span>→</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 使用相对路径，让nginx代理处理
+        const API_BASE = '';
+        const messagesContainer = document.getElementById('messages');
+        const questionInput = document.getElementById('questionInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const loading = document.getElementById('loading');
+
+        // 自动调整输入框高度
+        questionInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 96) + 'px';
+        });
+
+        // 处理键盘事件
+        function handleKeyDown(event) {
+            if (event.key === 'Enter') {
+                if (event.shiftKey) {
+                    // Shift+Enter 换行
+                    return;
+                } else {
+                    // Enter 发送消息
+                    event.preventDefault();
+                    sendMessage();
+                }
+            }
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            // 添加用户消息
+            addMessage('user', question);
+            
+            // 清空输入框
+            questionInput.value = '';
+            questionInput.style.height = 'auto';
+            
+            // 显示加载状态
+            setLoading(true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/qa/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                // 添加AI回答
+                addMessage('assistant', data.answer, data.sources, {
+                    responseTime: data.response_time_ms,
+                    confidence: data.confidence
+                });
+
+            } catch (error) {
+                console.error('Error:', error);
+                addErrorMessage(`请求失败: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // 预设问题点击
+        function askQuestion(question) {
+            questionInput.value = question;
+            sendMessage();
+        }
+
+        // 添加消息
+        function addMessage(role, content, sources, meta) {
+            // 隐藏欢迎界面
+            const welcome = document.querySelector('.welcome');
+            if (welcome) welcome.style.display = 'none';
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+
+            messageDiv.appendChild(contentDiv);
+
+            // 添加元信息
+            if (meta) {
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'message-meta';
+                metaDiv.innerHTML = `响应时间: ${meta.responseTime}ms | 置信度: ${(meta.confidence * 100).toFixed(1)}%`;
+                messageDiv.appendChild(metaDiv);
+            }
+
+            // 添加文档来源
+            if (sources && sources.length > 0) {
+                const sourcesDiv = document.createElement('div');
+                sourcesDiv.className = 'sources';
+                
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'sources-title';
+                titleDiv.textContent = '📚 参考来源:';
+                sourcesDiv.appendChild(titleDiv);
+
+                sources.forEach(source => {
+                    const sourceDiv = document.createElement('div');
+                    sourceDiv.className = 'source';
+                    
+                    const sourceTitleDiv = document.createElement('div');
+                    sourceTitleDiv.className = 'source-title';
+                    sourceTitleDiv.textContent = source.document_title || '未命名文档';
+                    
+                    const sourceContentDiv = document.createElement('div');
+                    sourceContentDiv.className = 'source-content';
+                    sourceContentDiv.textContent = source.chunk_content;
+                    
+                    sourceDiv.appendChild(sourceTitleDiv);
+                    sourceDiv.appendChild(sourceContentDiv);
+                    sourcesDiv.appendChild(sourceDiv);
+                });
+
+                contentDiv.appendChild(sourcesDiv);
+            }
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 添加错误消息
+        function addErrorMessage(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.innerHTML = `❌ ${message}`;
+            messagesContainer.appendChild(errorDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 设置加载状态
+        function setLoading(isLoading) {
+            loading.style.display = isLoading ? 'block' : 'none';
+            sendBtn.disabled = isLoading;
+            
+            if (isLoading) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }
+
+        // 页面加载完成后设置焦点
+        document.addEventListener('DOMContentLoaded', function() {
+            questionInput.focus();
+        });
+    </script>
+</body>
+</html>

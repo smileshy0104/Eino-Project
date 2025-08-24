@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"ai-doc-assistant/internal/model"
 	"ai-doc-assistant/internal/service"
 )
 
@@ -70,7 +71,33 @@ func (h *Handlers) BatchUpload(c *gin.Context) {
 }
 
 func (h *Handlers) AskQuestion(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented"})
+	var req model.QueryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "无效的请求参数",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// 设置默认值
+	if req.TopK == 0 {
+		req.TopK = 5
+	}
+
+	ctx := c.Request.Context()
+	
+	// 调用Eino服务进行问答
+	response, err := h.einoService.QueryKnowledge(ctx, req.Question)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "查询失败",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *Handlers) QueryHistory(c *gin.Context) {
