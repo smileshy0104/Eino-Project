@@ -1,6 +1,0 @@
-[mysql] 2025/08/24 08:26:15 packets.go:37: unexpected EOF
-[mysql] 2025/08/24 08:26:16 packets.go:37: unexpected EOF
-[mysql] 2025/08/24 08:26:16 packets.go:37: unexpected EOF
-
-2025/08/24 08:26:16 [35m/Users/yuyansong/AiProject/Eino/ai-doc-assistant/internal/repository/database.go:29
-[0m[31m[error] [0mfailed to initialize database, got error driver: bad connection
