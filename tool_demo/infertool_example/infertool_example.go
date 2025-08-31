@@ -380,6 +380,7 @@ func demonstrateInferTool() {
 	fmt.Printf("工具描述: %s\n", toolInfo.Desc)
 
 	// 调用工具，传入 JSON 字符串作为参数
+	// 默认userTool.InvokableRun会将JSON字符串反序列化为CreateUserRequest结构体，然后传递给createUser函数
 	userResult, err := userTool.InvokableRun(ctx, `{
 		"name": "张三",
 		"email": "zhangsan@example.com",

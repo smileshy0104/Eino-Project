@@ -287,9 +287,9 @@ func demonstrateBasicTools() {
 	ctx := context.Background()
 
 	// 1. 创建所有工具的实例
-	calculator := &CalculatorTool{}
-	textProcessor := &TextProcessorTool{}
-	mathTool := &MathTool{}
+	calculator := &CalculatorTool{}       // 创建计算器工具实例
+	textProcessor := &TextProcessorTool{} // 创建文本处理工具实例
+	mathTool := &MathTool{}               // 创建数学函数工具实例
 
 	fmt.Println("=== 基本 Tool 实现演示 ===")
 
