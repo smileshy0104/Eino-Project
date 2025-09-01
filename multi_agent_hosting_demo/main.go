@@ -484,11 +484,55 @@ func createWeatherSpecialist(ctx context.Context) (compose.Runnable[[]*schema.Me
 		return nil, fmt.Errorf("创建Weather Specialist失败: %v", err)
 	}
 	
-	// 创建专门的处理链 - 构建天气专家的执行流程
-	// 使用 Eino 框架的链式组合模式，支持消息流处理
+	// 创建支持工具调用的处理链 - 构建天气专家的完整执行流程
+	// 使用类似 React Agent 的模式：ChatModel -> Tool Executor -> ChatModel
 	chain := compose.NewChain[[]*schema.Message, *schema.Message]()
-	// 将聊天模型添加到链中，设置节点名称便于调试和监控
-	chain.AppendChatModel(chatModel, compose.WithNodeName("weather_specialist"))
+	
+	// 第一层：理解意图并生成工具调用
+	chain.AppendChatModel(chatModel, compose.WithNodeName("weather_intent_analysis"))
+	
+	// 第二层：执行工具调用
+	chain.AppendLambda(compose.InvokableLambda(func(ctx context.Context, msg *schema.Message) ([]*schema.Message, error) {
+		// 检查是否有工具调用
+		if len(msg.ToolCalls) > 0 {
+			var allMessages []*schema.Message
+			allMessages = append(allMessages, msg)
+			
+			// 处理每个工具调用
+			for _, toolCall := range msg.ToolCalls {
+				var toolResponse string
+				var err error
+				
+				// 执行天气工具
+				if toolCall.Function.Name == "get_weather" {
+					weatherTool := &WeatherTool{}
+					toolResponse, err = weatherTool.InvokableRun(ctx, toolCall.Function.Arguments)
+				} else {
+					toolResponse = `{"error": "未知工具"}`
+					err = fmt.Errorf("未知工具: %s", toolCall.Function.Name)
+				}
+				
+				if err != nil {
+					toolResponse = fmt.Sprintf(`{"error": "工具执行失败", "details": "%s"}`, err.Error())
+				}
+				
+				// 创建工具响应消息
+				toolMessage := &schema.Message{
+					Role:       schema.Tool,
+					Content:    toolResponse,
+					ToolCallID: toolCall.ID,
+				}
+				allMessages = append(allMessages, toolMessage)
+			}
+			
+			return allMessages, nil
+		}
+		
+		return []*schema.Message{msg}, nil
+	}), compose.WithNodeName("weather_tool_executor"))
+	
+	// 第三层：基于工具结果生成最终回复
+	chain.AppendChatModel(chatModel, compose.WithNodeName("weather_response_generator"))
 	
 	// 编译处理链 - 将配置转换为可执行的智能体实例
 	specialist, err := chain.Compile(ctx)
@@ -523,11 +567,54 @@ func createCalculatorSpecialist(ctx context.Context) (compose.Runnable[[]*schema
 		return nil, fmt.Errorf("创建Calculator Specialist失败: %v", err)
 	}
 	
-	// 创建专门的处理链 - 构建计算专家的执行流程
-	// 使用 Eino 框架的链式组合模式，支持消息流处理
+	// 创建支持工具调用的处理链 - 构建计算专家的完整执行流程
 	chain := compose.NewChain[[]*schema.Message, *schema.Message]()
-	// 将聊天模型添加到链中，设置节点名称便于调试和监控
-	chain.AppendChatModel(chatModel, compose.WithNodeName("calculator_specialist"))
+	
+	// 第一层：理解意图并生成工具调用
+	chain.AppendChatModel(chatModel, compose.WithNodeName("calculator_intent_analysis"))
+	
+	// 第二层：执行工具调用
+	chain.AppendLambda(compose.InvokableLambda(func(ctx context.Context, msg *schema.Message) ([]*schema.Message, error) {
+		// 检查是否有工具调用
+		if len(msg.ToolCalls) > 0 {
+			var allMessages []*schema.Message
+			allMessages = append(allMessages, msg)
+			
+			// 处理每个工具调用
+			for _, toolCall := range msg.ToolCalls {
+				var toolResponse string
+				var err error
+				
+				// 执行计算工具
+				if toolCall.Function.Name == "calculate" {
+					calcTool := &CalculatorTool{}
+					toolResponse, err = calcTool.InvokableRun(ctx, toolCall.Function.Arguments)
+				} else {
+					toolResponse = `{"error": "未知工具"}`
+					err = fmt.Errorf("未知工具: %s", toolCall.Function.Name)
+				}
+				
+				if err != nil {
+					toolResponse = fmt.Sprintf(`{"error": "工具执行失败", "details": "%s"}`, err.Error())
+				}
+				
+				// 创建工具响应消息
+				toolMessage := &schema.Message{
+					Role:       schema.Tool,
+					Content:    toolResponse,
+					ToolCallID: toolCall.ID,
+				}
+				allMessages = append(allMessages, toolMessage)
+			}
+			
+			return allMessages, nil
+		}
+		
+		return []*schema.Message{msg}, nil
+	}), compose.WithNodeName("calculator_tool_executor"))
+	
+	// 第三层：基于工具结果生成最终回复
+	chain.AppendChatModel(chatModel, compose.WithNodeName("calculator_response_generator"))
 	
 	// 编译处理链 - 将配置转换为可执行的智能体实例
 	specialist, err := chain.Compile(ctx)
@@ -562,11 +649,54 @@ func createTimeSpecialist(ctx context.Context) (compose.Runnable[[]*schema.Messa
 		return nil, fmt.Errorf("创建Time Specialist失败: %v", err)
 	}
 	
-	// 创建专门的处理链 - 构建时间专家的执行流程
-	// 使用 Eino 框架的链式组合模式，支持消息流处理
+	// 创建支持工具调用的处理链 - 构建时间专家的完整执行流程
 	chain := compose.NewChain[[]*schema.Message, *schema.Message]()
-	// 将聊天模型添加到链中，设置节点名称便于调试和监控
-	chain.AppendChatModel(chatModel, compose.WithNodeName("time_specialist"))
+	
+	// 第一层：理解意图并生成工具调用
+	chain.AppendChatModel(chatModel, compose.WithNodeName("time_intent_analysis"))
+	
+	// 第二层：执行工具调用
+	chain.AppendLambda(compose.InvokableLambda(func(ctx context.Context, msg *schema.Message) ([]*schema.Message, error) {
+		// 检查是否有工具调用
+		if len(msg.ToolCalls) > 0 {
+			var allMessages []*schema.Message
+			allMessages = append(allMessages, msg)
+			
+			// 处理每个工具调用
+			for _, toolCall := range msg.ToolCalls {
+				var toolResponse string
+				var err error
+				
+				// 执行时间工具
+				if toolCall.Function.Name == "get_time" {
+					timeTool := &TimeTool{}
+					toolResponse, err = timeTool.InvokableRun(ctx, toolCall.Function.Arguments)
+				} else {
+					toolResponse = `{"error": "未知工具"}`
+					err = fmt.Errorf("未知工具: %s", toolCall.Function.Name)
+				}
+				
+				if err != nil {
+					toolResponse = fmt.Sprintf(`{"error": "工具执行失败", "details": "%s"}`, err.Error())
+				}
+				
+				// 创建工具响应消息
+				toolMessage := &schema.Message{
+					Role:       schema.Tool,
+					Content:    toolResponse,
+					ToolCallID: toolCall.ID,
+				}
+				allMessages = append(allMessages, toolMessage)
+			}
+			
+			return allMessages, nil
+		}
+		
+		return []*schema.Message{msg}, nil
+	}), compose.WithNodeName("time_tool_executor"))
+	
+	// 第三层：基于工具结果生成最终回复
+	chain.AppendChatModel(chatModel, compose.WithNodeName("time_response_generator"))
 	
 	// 编译处理链 - 将配置转换为可执行的智能体实例
 	specialist, err := chain.Compile(ctx)
