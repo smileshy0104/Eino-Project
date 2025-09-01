@@ -454,12 +454,94 @@ func main() {
 	// 这是 React Agent 实现工具调用能力的关键步骤
 	chatModel.BindTools(toolInfos)
 
-	// React Agent 链构建 - 创建简化版的处理链
-	// 使用 Eino 框架的 Chain 组合器构建处理流水线
-	// 定义从用户输入到最终输出的完整处理流程
-	chain := compose.NewChain[[]*schema.Message, *schema.Message]()
-	// 添加聊天模型节点，负责消息理解、工具调用和回复生成
-	chain.AppendChatModel(chatModel, compose.WithNodeName("chat_model"))
+	// React Agent 链构建 - 创建支持多轮对话的工具调用处理链
+	// 使用更强化的链结构确保工具调用和响应生成的可靠性
+	chain := compose.NewChain[[]*schema.Message, []*schema.Message]()
+	
+	// 第一层：理解用户意图并决定工具调用
+	chain.AppendChatModel(chatModel, compose.WithNodeName("intent_analysis"))
+	
+	// 第二层：执行工具调用并生成工具响应
+	chain.AppendLambda(compose.InvokableLambda(func(ctx context.Context, msg *schema.Message) ([]*schema.Message, error) {
+		// 记录调试信息
+		log.Printf("工具执行阶段 - 消息角色: %s, 工具调用数量: %d", msg.Role, len(msg.ToolCalls))
+		
+		// 检查是否有工具调用需要处理
+		if msg.ToolCalls != nil && len(msg.ToolCalls) > 0 {
+			var allMessages []*schema.Message
+			
+			// 保持原始助手消息（包含工具调用）
+			allMessages = append(allMessages, msg)
+			
+			// 处理每个工具调用
+			for _, toolCall := range msg.ToolCalls {
+				var toolResponse string
+				var err error
+				
+				log.Printf("执行工具: %s, 参数: %s", toolCall.Function.Name, toolCall.Function.Arguments)
+				
+				// 根据工具名称执行对应的工具
+				switch toolCall.Function.Name {
+				case "get_weather":
+					weatherTool := &WeatherTool{}
+					toolResponse, err = weatherTool.InvokableRun(ctx, toolCall.Function.Arguments)
+				case "calculate":
+					calcTool := &CalculatorTool{}
+					toolResponse, err = calcTool.InvokableRun(ctx, toolCall.Function.Arguments)
+				case "get_time":
+					timeTool := &TimeTool{}
+					toolResponse, err = timeTool.InvokableRun(ctx, toolCall.Function.Arguments)
+				default:
+					toolResponse = `{"error": "未知工具: ` + toolCall.Function.Name + `"}`
+					err = fmt.Errorf("未知工具: %s", toolCall.Function.Name)
+				}
+				
+				// 处理工具执行错误
+				if err != nil {
+					toolResponse = fmt.Sprintf(`{"error": "工具执行失败", "details": "%s"}`, err.Error())
+					log.Printf("工具执行失败: %v", err)
+				} else {
+					log.Printf("工具执行成功: %s", toolResponse)
+				}
+				
+				// 创建工具响应消息
+				toolMessage := &schema.Message{
+					Role:       schema.Tool,
+					Content:    toolResponse,
+					ToolCallID: toolCall.ID,
+				}
+				allMessages = append(allMessages, toolMessage)
+			}
+			
+			return allMessages, nil
+		}
+		
+		// 如果没有工具调用，保持消息不变
+		log.Printf("无工具调用，直接传递消息")
+		return []*schema.Message{msg}, nil
+	}), compose.WithNodeName("tool_executor"))
+	
+	// 第三层：基于工具结果生成最终回复
+	chain.AppendChatModel(chatModel, compose.WithNodeName("response_generator"))
+	
+	// 第四层：确保输出格式标准化
+	chain.AppendLambda(compose.InvokableLambda(func(ctx context.Context, msg *schema.Message) ([]*schema.Message, error) {
+		log.Printf("最终输出 - 角色: %s, 内容长度: %d", msg.Role, len(msg.Content))
+		
+		// 确保我们有实际的响应内容
+		if msg.Role == schema.Assistant && (msg.Content == "" || msg.Content == " ") {
+			// 如果内容为空，尝试重新生成
+			log.Printf("检测到空响应，尝试重新生成...")
+			return []*schema.Message{
+				{
+					Role:    schema.Assistant,
+					Content: "抱歉，我在处理您的请求时遇到了问题，请您稍后重试。",
+				},
+			}, nil
+		}
+		
+		return []*schema.Message{msg}, nil
+	}), compose.WithNodeName("output_validator"))
 
 	// React Agent 编译 - 将链组装成可执行的代理
 	// 编译过程会验证链的完整性、优化执行流程并生成最终的可执行代理
@@ -525,7 +607,7 @@ func main() {
 		// React Agent 执行调用 - 核心的推理和工具调用过程
 		// 将消息传递给编译后的 React Agent，触发完整的推理流程：
 		// 1. 理解用户意图 2. 选择合适工具 3. 执行工具调用 4. 生成最终回复
-		result, err := compiledChain.Invoke(ctx, messages)
+		results, err := compiledChain.Invoke(ctx, messages)
 		if err != nil {
 			fmt.Printf("❌ 执行失败: %v\n", err)
 			continue // 跳过失败的测试用例，继续执行后续测试
@@ -533,13 +615,21 @@ func main() {
 
 		// 结果输出展示 - 向用户展示 React Agent 的处理结果
 		// 检查返回结果的有效性，确保能够正确显示 Agent 的回复内容
-		if result != nil && result.Content != "" {
-			// 输出 Agent 经过推理和工具调用后生成的最终回复内容
-			fmt.Printf("🤖 小艾诺: %s\n", result.Content)
+		if results != nil && len(results) > 0 {
+			// 取最后一条消息作为最终回复
+			lastMessage := results[len(results)-1]
+			if lastMessage != nil && lastMessage.Content != "" {
+				// 输出 Agent 经过推理和工具调用后生成的最终回复内容
+				fmt.Printf("🤖 小艾诺: %s\n", lastMessage.Content)
+			} else {
+				// 处理异常情况：Agent 没有返回有效内容时的提示信息
+				fmt.Printf("🤖 小艾诺: [最后一条消息内容为空]\n")
+				fmt.Printf("Debug: lastMessage=%+v\n", lastMessage) // 调试信息，帮助排查问题
+			}
 		} else {
-			// 处理异常情况：Agent 没有返回有效内容时的提示信息
-			fmt.Printf("🤖 小艾诺: [没有收到回复内容]\n")
-			fmt.Printf("Debug: result=%+v\n", result) // 调试信息，帮助排查问题
+			// 处理异常情况：Agent 没有返回消息时的提示信息
+			fmt.Printf("🤖 小艾诺: [没有收到回复消息]\n")
+			fmt.Printf("Debug: results=%+v\n", results) // 调试信息，帮助排查问题
 		}
 
 		// 执行间隔控制 - 在测试用例之间添加适当的延迟
