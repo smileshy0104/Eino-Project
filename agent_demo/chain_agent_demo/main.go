@@ -426,16 +426,80 @@ func createAgentChain(ctx context.Context) (compose.Runnable[[]*schema.Message, 
 	}
 	log.Println("聊天模型创建成功")
 
-	// 3. 构建 Chain - 使用Lambda来处理类型转换
-	// Chain 是最基础的 Agent 形式，处理流程为线性序列
+	// 3. 构建 Chain - 使用完整的工具执行流程
+	// Chain 架构：用户输入 -> LLM处理 -> 工具执行 -> 结果返回
 	chain := compose.NewChain[[]*schema.Message, []*schema.Message]()
 	chain.AppendChatModel(chatModel, compose.WithNodeName("chat_model"))
 	
-	// 添加Lambda来将单个Message转换为Message数组
-	// 这个转换确保了 Chain 输入输出类型的一致性
+	// 添加工具执行Lambda - 这是关键修复！
+	// 当LLM生成工具调用时，此Lambda负责执行对应工具并生成响应消息
 	chain.AppendLambda(compose.InvokableLambda(func(ctx context.Context, msg *schema.Message) ([]*schema.Message, error) {
-		return []*schema.Message{msg}, nil
-	}), compose.WithNodeName("message_wrapper"))
+		// 检查消息是否包含工具调用
+		if len(msg.ToolCalls) == 0 {
+			// 没有工具调用，直接返回原消息
+			return []*schema.Message{msg}, nil
+		}
+
+		log.Printf("[ToolExecutor] 检测到 %d 个工具调用", len(msg.ToolCalls))
+		
+		// 创建工具映射以快速查找
+		toolMap := make(map[string]tool.InvokableTool)
+		for _, t := range tools {
+			info, err := t.Info(ctx)
+			if err != nil {
+				continue
+			}
+			toolMap[info.Name] = t
+		}
+
+		// 执行所有工具调用
+		toolResults := make([]*schema.Message, 0, len(msg.ToolCalls)+1)
+		
+		// 首先添加助手消息（包含工具调用）
+		toolResults = append(toolResults, msg)
+		
+		// 然后执行每个工具调用并创建工具结果消息
+		for _, toolCall := range msg.ToolCalls {
+			log.Printf("[ToolExecutor] 执行工具: %s", toolCall.Function.Name)
+			
+			// 查找对应的工具
+			targetTool, exists := toolMap[toolCall.Function.Name]
+			if !exists {
+				log.Printf("[ToolExecutor] 工具未找到: %s", toolCall.Function.Name)
+				// 创建错误响应
+				toolResults = append(toolResults, &schema.Message{
+					Role: schema.Tool,
+					Content: fmt.Sprintf(`{"error": "工具 '%s' 不存在"}`, toolCall.Function.Name),
+					ToolCallID: toolCall.ID,
+				})
+				continue
+			}
+
+			// 执行工具
+			result, err := targetTool.InvokableRun(ctx, toolCall.Function.Arguments)
+			if err != nil {
+				log.Printf("[ToolExecutor] 工具执行失败: %s - %v", toolCall.Function.Name, err)
+				// 创建错误响应
+				toolResults = append(toolResults, &schema.Message{
+					Role: schema.Tool,
+					Content: fmt.Sprintf(`{"error": "工具执行失败: %v"}`, err),
+					ToolCallID: toolCall.ID,
+				})
+				continue
+			}
+
+			log.Printf("[ToolExecutor] 工具执行成功: %s", toolCall.Function.Name)
+			
+			// 创建工具结果消息
+			toolResults = append(toolResults, &schema.Message{
+				Role:       schema.Tool,
+				Content:    result,
+				ToolCallID: toolCall.ID,
+			})
+		}
+
+		return toolResults, nil
+	}), compose.WithNodeName("tool_executor"))
 
 	// 4. 编译 Chain
 	// 编译过程将 Chain 配置转换为可执行的 Agent 实例

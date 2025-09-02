@@ -443,11 +443,98 @@ func createGraphAgent(ctx context.Context) (compose.Runnable[[]*schema.Message, 
 	// ChatModel 节点负责与大语言模型交互，执行推理和工具调用
 	g.AddChatModelNode(CLASSIFIER, chatModel)
 
+	// 添加工具执行器节点 - 关键修复！
+	// 负责执行LLM生成的工具调用，这是Graph Agent能够实际调用工具的核心机制
+	g.AddLambdaNode("tool_executor", compose.InvokableLambda(func(ctx context.Context, msg *schema.Message) ([]*schema.Message, error) {
+		// 检查消息是否包含工具调用
+		if len(msg.ToolCalls) == 0 {
+			// 没有工具调用，直接返回原消息
+			return []*schema.Message{msg}, nil
+		}
+
+		log.Printf("[ToolExecutor] 检测到 %d 个工具调用", len(msg.ToolCalls))
+		
+		// 创建工具映射以快速查找
+		toolMap := make(map[string]tool.InvokableTool)
+		for _, t := range tools {
+			info, err := t.Info(ctx)
+			if err != nil {
+				continue
+			}
+			toolMap[info.Name] = t
+		}
+
+		// 执行所有工具调用
+		toolResults := make([]*schema.Message, 0, len(msg.ToolCalls)+1)
+		
+		// 首先添加助手消息（包含工具调用）
+		toolResults = append(toolResults, msg)
+		
+		// 然后执行每个工具调用并创建工具结果消息
+		for _, toolCall := range msg.ToolCalls {
+			log.Printf("[ToolExecutor] 执行工具: %s", toolCall.Function.Name)
+			
+			// 查找对应的工具
+			targetTool, exists := toolMap[toolCall.Function.Name]
+			if !exists {
+				log.Printf("[ToolExecutor] 工具未找到: %s", toolCall.Function.Name)
+				// 创建错误响应
+				toolResults = append(toolResults, &schema.Message{
+					Role: schema.Tool,
+					Content: fmt.Sprintf(`{"error": "工具 '%s' 不存在"}`, toolCall.Function.Name),
+					ToolCallID: toolCall.ID,
+				})
+				continue
+			}
+
+			// 执行工具
+			result, err := targetTool.InvokableRun(ctx, toolCall.Function.Arguments)
+			if err != nil {
+				log.Printf("[ToolExecutor] 工具执行失败: %s - %v", toolCall.Function.Name, err)
+				// 创建错误响应
+				toolResults = append(toolResults, &schema.Message{
+					Role: schema.Tool,
+					Content: fmt.Sprintf(`{"error": "工具执行失败: %v"}`, err),
+					ToolCallID: toolCall.ID,
+				})
+				continue
+			}
+
+			log.Printf("[ToolExecutor] 工具执行成功: %s", toolCall.Function.Name)
+			
+			// 创建工具结果消息
+			toolResults = append(toolResults, &schema.Message{
+				Role:       schema.Tool,
+				Content:    result,
+				ToolCallID: toolCall.ID,
+			})
+		}
+
+		return toolResults, nil
+	}))
+
 	// 添加消息包装器节点处理类型转换
 	// Lambda 节点用于执行自定义逻辑，这里用于消息格式转换
-	g.AddLambdaNode("message_wrapper", compose.InvokableLambda(func(ctx context.Context, msg *schema.Message) ([]*schema.Message, error) {
-		// 将单个消息包装成消息数组，满足后续节点的输入要求
-		return []*schema.Message{msg}, nil
+	g.AddLambdaNode("message_wrapper", compose.InvokableLambda(func(ctx context.Context, msgs []*schema.Message) ([]*schema.Message, error) {
+		// 处理工具执行结果，将多条消息合并为处理流程所需的格式
+		if len(msgs) == 0 {
+			return msgs, nil
+		}
+		
+		// 获取最后一条消息或工具结果消息进行后续处理
+		var lastMsg *schema.Message
+		for i := len(msgs) - 1; i >= 0; i-- {
+			if msgs[i].Role == schema.Assistant || msgs[i].Role == schema.Tool {
+				lastMsg = msgs[i]
+				break
+			}
+		}
+		
+		if lastMsg == nil {
+			lastMsg = msgs[len(msgs)-1]
+		}
+		
+		return []*schema.Message{lastMsg}, nil
 	}))
 
 	// 5. 添加条件处理器节点 - Graph 的核心路由逻辑
@@ -536,10 +623,11 @@ func createGraphAgent(ctx context.Context) (compose.Runnable[[]*schema.Message, 
 
 	// 8. 定义 Graph 的边关系（节点连接）
 	// 边关系定义了数据在 Graph 中的流向，决定了执行顺序
-	// 这里采用线性流水线模式，但 Graph 支持更复杂的分支和并行结构
-	g.AddEdge(compose.START, CLASSIFIER)                  // 开始 -> 任务分类
-	g.AddEdge(CLASSIFIER, "message_wrapper")              // 分类 -> 消息包装
-	g.AddEdge("message_wrapper", "conditional_processor") // 包装 -> 条件处理
+	// 修复后的流程：开始 -> 分类+工具调用 -> 工具执行 -> 消息包装 -> 条件处理 -> 质量检查 -> 聚合 -> 结束
+	g.AddEdge(compose.START, CLASSIFIER)                  // 开始 -> 任务分类（LLM可能生成工具调用）
+	g.AddEdge(CLASSIFIER, "tool_executor")                // 分类 -> 工具执行（执行LLM生成的工具调用）
+	g.AddEdge("tool_executor", "message_wrapper")         // 工具执行 -> 消息包装（处理工具执行结果）
+	g.AddEdge("message_wrapper", "conditional_processor") // 包装 -> 条件处理（基于结果进行分支逻辑）
 	g.AddEdge("conditional_processor", QUALITY_CHECK)     // 处理 -> 质量检查
 	g.AddEdge(QUALITY_CHECK, AGGREGATOR)                  // 检查 -> 结果聚合
 	g.AddEdge(AGGREGATOR, compose.END)                    // 聚合 -> 结束
