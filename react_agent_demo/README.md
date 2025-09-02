@@ -1,6 +1,7 @@
 # Eino React Agent Demo
 
 ## 🤖 项目简介
+ReAct（Reasoning + Acting）Agent 结合了推理和行动能力，通过思考-行动-观察的循环来解决复杂问题。它能够在执行任务时进行深入的推理，并根据观察结果调整策略，特别适合需要多步推理的复杂场景。
 
 这是一个基于 Eino 框架的 React Agent 演示项目，展示了如何使用"推理-行动"（Reasoning-Acting）循环构建智能代理。React Agent 是一种能够进行复杂多步推理的智能代理架构，它可以根据用户输入自动选择和执行合适的工具来完成任务。
 

@@ -1,6 +1,7 @@
 # Eino Multi-Agent Hosting Demo
 
 ## 🏢 项目简介
+Multi Agent 系统由多个协同工作的 Agent 组成，每个 Agent 都有其特定的职责和专长。通过 Agent 间的交互与协作，可以处理更复杂的任务，实现分工协作。这种方式特别适合需要多个专业领域知识结合的场景。
 
 这是一个基于 Eino 框架的多代理托管（Multi-Agent Hosting）演示项目，展示了如何构建一个具有意图识别和任务路由功能的多代理系统。该架构通过 Host Agent 进行意图分析，然后将请求路由到专门的 Specialist Agents 来处理特定任务。
 
