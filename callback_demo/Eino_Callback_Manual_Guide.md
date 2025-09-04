@@ -112,27 +112,99 @@ func (h *MyHandler) OnEndWithStreamOutput(ctx context.Context, runInfo *callback
 }
 ```
 
-### **3. 回调处理器参数**
+### **3. Handler 接口定义**
 
-每个回调方法都接收三类关键参数：
+Eino 回调处理器必须实现完整的 Handler 接口：
 
-#### **Context**
 ```go
-ctx context.Context
-// - 请求上下文信息
-// - 超时控制
-// - 取消信号
-// - 跨组件数据传递
-```
-
-#### **RunInfo (元信息)**
-```go
-type RunInfo struct {
-    Name     string              // 组件/节点名称
-    Type     string              // 组件类型
-    Component components.Component // 组件实例
+type Handler interface {
+    OnStart(ctx context.Context, info *RunInfo, input CallbackInput) context.Context
+    OnEnd(ctx context.Context, info *RunInfo, output CallbackOutput) context.Context
+    OnError(ctx context.Context, info *RunInfo, err error) context.Context
+    OnStartWithStreamInput(ctx context.Context, info *RunInfo, 
+        input *schema.StreamReader[CallbackInput]) context.Context
+    OnEndWithStreamOutput(ctx context.Context, info *RunInfo, 
+        output *schema.StreamReader[CallbackOutput]) context.Context
 }
 ```
+
+#### **接口特点**
+- 所有方法都返回 `context.Context`，用于在同一 Handler 的不同触发时机间传递信息
+- 支持常规执行和流式执行的完整生命周期
+- 通过 RunInfo 获取触发实体的元信息
+
+### **4. RunInfo 结构定义**
+
+RunInfo 包含触发回调的实体的完整元信息：
+
+```go
+type RunInfo struct {
+    Name      string               // 用户指定的语义化名称
+    Type      string               // 具体实现类型标识
+    Component components.Component // 组件抽象类型实例
+}
+```
+
+#### **RunInfo 注入方式**
+
+Eino 提供三种 RunInfo 注入机制：
+
+##### **方式一：Graph 管理注入（自动）**
+```go
+// Graph 中的 Node 会自动获得对应的 RunInfo
+// 无需手动处理，Graph 框架自动管理
+```
+
+##### **方式二：外部手动注入**
+```go
+// 创建 RunInfo
+runInfo := &callbacks.RunInfo{
+    Name:      "my_component",
+    Type:      "ChatModel", 
+    Component: component,
+}
+
+// 初始化回调上下文
+ctx = callbacks.InitCallbacks(ctx, runInfo, handlers...)
+```
+
+##### **方式三：复用现有 Handler**
+```go
+// 复用当前上下文中的 Handler，但使用新的 RunInfo
+ctx = callbacks.ReuseHandlers(ctx, newRunInfo)
+```
+
+### **5. Handler 继承机制**
+
+Handler 通过 Context 进行继承传递：
+
+```go
+// Handler 像 context.Value 一样通过 Context 传递
+// Graph 运行时会自动继承父级 Context 中的 Handler
+// 支持层级化的 Handler 管理
+
+// 示例：父级注入的 Handler 会自动传递给子级
+parentCtx = callbacks.InitCallbacks(parentCtx, parentRunInfo, parentHandler)
+childCtx = callbacks.InitCallbacks(parentCtx, childRunInfo, childHandler)
+// childCtx 中同时包含 parentHandler 和 childHandler
+```
+
+### **6. 回调处理器参数详解**
+
+每个回调方法都接收标准的三类参数：
+
+#### **Context 参数**
+```go
+ctx context.Context
+// - 请求上下文信息和生命周期控制
+// - 超时控制和取消信号
+// - Handler 间信息传递的载体
+// - 支持 Handler 继承机制
+```
+
+#### **RunInfo 参数（元信息）**
+- 详见上文 RunInfo 结构定义
+- 提供触发回调的实体完整身份信息
 
 #### **Input/Output (业务数据)**
 ```go
@@ -184,13 +256,61 @@ type CallbackOutput struct {
 并都会返回新的 Context：用于同一个 Handler 的不同触发时机之间传递信息。
 ```
 
+### **7. Handler 构建工具**
+
+Eino 提供了两种便捷的 Handler 构建工具：
+
+#### **HandlerHelper - 类型特化构建（只关注特定组件时使用）**
+```go
+// 针对不同组件类型提供专门的处理逻辑
+handler := callbacks.NewHandlerHelper().
+    ChatModel(chatModelHandler).      // ChatModel 专用处理器
+    Tool(toolHandler).                // Tool 专用处理器  
+    Retriever(retrieverHandler).      // Retriever 专用处理器
+    Lambda(lambdaHandler).            // Lambda 专用处理器
+    Handler()                         // 构建最终的 Handler
+```
+
+#### **HandlerBuilder - 函数式构建**
+```go
+// 通过函数组合的方式构建 Handler
+handler := callbacks.NewHandlerBuilder().
+    OnStartFn(func(ctx context.Context, info *RunInfo, input CallbackInput) context.Context {
+        log.Printf("Component [%s] started", info.Name)
+        return ctx
+    }).
+    OnEndFn(func(ctx context.Context, info *RunInfo, output CallbackOutput) context.Context {
+        log.Printf("Component [%s] completed", info.Name) 
+        return ctx
+    }).
+    OnErrorFn(func(ctx context.Context, info *RunInfo, err error) context.Context {
+        log.Printf("Component [%s] failed: %v", info.Name, err)
+        return ctx
+    }).
+    Build()                           // 构建最终的 Handler
+```
+
+### **8. 时机类型定义**
+
+Eino 定义了五种标准的回调时机：
+
+```go
+const (
+    TimingOnStart                = "OnStart"                // 开始执行
+    TimingOnEnd                  = "OnEnd"                  // 成功结束
+    TimingOnError                = "OnError"                // 执行出错
+    TimingOnStartWithStreamInput = "OnStartWithStreamInput" // 流式输入开始
+    TimingOnEndWithStreamOutput  = "OnEndWithStreamOutput"  // 流式输出结束
+)
+```
+
 ---
 
 ## 🔧 **回调注入方式**
 
 ### **方式一：全局注入**
 
-全局注入对所有组件和编排————都生效，是最广泛的监控方式。
+全局注入对所有组件和编排都生效，是最广泛的监控方式。
 
 #### **使用方法**
 ```go
@@ -620,7 +740,7 @@ type BadHandler struct {
     sharedState map[string]interface{} // 容易出现竞态条件
 }
 
-// ✅ 正确示例：使用 Context 传递请求维度信息
+// ✅ 正确示例：使用 Context 传递请求维度信息（需要是同一个Handler ）
 func (h *GoodHandler) OnStart(ctx context.Context, runInfo *callbacks.RunInfo, input interface{}) {
     // 将信息存储到 context 中
     ctx = context.WithValue(ctx, "start_time", time.Now())
