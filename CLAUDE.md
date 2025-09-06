@@ -64,35 +64,29 @@
 - `use_methods/` - 使用方法示例
 
 ## 最近活动记录
-- 2025-08-22: 用户询问 Claude 如何获取历史对话记录
-- 2025-08-22: 创建了此 CLAUDE.md 文件用于记录项目信息和会话历史
-- 2025-08-22: 完成项目整体结构分析，了解了 Eino 框架的完整生态
-- 2025-08-22: 创建了形象生动的组件关系说明文档 `Eino_Components_Relationship.md`
-  - 使用"智能图书馆"比喻解释各组件作用
-  - 包含完整的组件协作流程图
-  - 提供实际应用场景示例
-- 2025-08-22: 学习了 Eino 官方编排设计原则
-  - 类型对齐原则、设计理念、双引擎支持等
-- 2025-08-22: 创建了编排概念详解文档 `Eino_Orchestration_Guide.md`
-  - 以汽车流水线比喻编排概念
-  - 详细对比 Chain vs Graph 两种编排方式
-  - 包含丰富的 ASCII 图解和实际代码示例
-  - 涵盖最佳实践和性能优化建议
-- 2025-08-22: 创建了 Eino 开源框架全景解析文档 `Eino_Open_Source_Overview.md`
-  - 用"搭积木"比喻解释 Eino 的核心价值
-  - 详细对比 Eino vs LangChain vs 其他框架
-  - 包含完整的技术架构图和使用场景分析
-- 2025-08-22: 创建了字节跳动 Eino 实践案例解析文档 `ByteDance_Eino_Practice.md`
-  - 用"足球队"比喻阐述 Eino 开发理念
-  - 详解豆包、抖音等产品的实际应用案例
-  - 包含具体的性能数据和开发效率提升指标
-  - 提供完整的学习路径和最佳实践建议
-- 2025-08-22: 创建了 AI 辅助编程完全新手指南 `AI_Programming_Assistant_Guide.md`
-  - 面向完全不懂 AI 的程序员的零基础教学
-  - 详解 LLM、RAG、MCP、Agent 等核心概念
-  - 包含大量实际代码示例和使用场景
-  - 提供完整的个人博客系统开发实战案例
-  - 涵盖从新手到专家的完整学习路径
+### 2025-08-22 基础文档创建阶段
+- 用户询问 Claude 如何获取历史对话记录
+- 创建了此 CLAUDE.md 文件用于记录项目信息和会话历史
+- 完成项目整体结构分析，了解了 Eino 框架的完整生态
+- 创建了形象生动的组件关系说明文档 `Eino_Components_Relationship.md`
+- 创建了编排概念详解文档 `Eino_Orchestration_Guide.md`
+- 创建了 Eino 开源框架全景解析文档 `Eino_Open_Source_Overview.md`
+- 创建了字节跳动 Eino 实践案例解析文档 `ByteDance_Eino_Practice.md`
+- 创建了 AI 辅助编程完全新手指南 `AI_Programming_Assistant_Guide.md`
+
+### 2025-09-06 ADK 演示开发阶段
+- 阅读并分析了 Eino ADK 概览文档（https://www.cloudwego.io/zh/docs/eino/core_modules/eino_adk/outline/）
+- 创建了通俗易懂的 ADK 指南文档 `Eino_ADK_Guide.md`
+- 开发了基于概念的多智能体演示代码
+- 基于真实 GitHub 仓库（https://github.com/cloudwego/eino）修复了所有演示代码
+- 创建了符合官方标准的工具演示 `corrected_official_demo.go`
+
+### 2025-09-06 Agent 扩展机制开发阶段  
+- 深入研究了 Agent 扩展文档（https://www.cloudwego.io/zh/docs/eino/core_modules/eino_adk/agent_extension/）
+- 创建了 Agent 扩展机制完整指南 `Eino_ADK_Agent_Extension_Guide.md`
+- 开发了完整的中断与恢复功能演示 `agent_extension_demo.go`
+- 创建了稳定可靠的扩展机制演示 `stable_extension_demo.go`
+- 完善了项目文档，包含两个主要演示方向：工具接口 + 扩展机制
 
 ## 开发偏好
 - 平台：macOS (Darwin 24.6.0)
@@ -108,3 +102,4 @@
 - 每次 Claude Code 会话都是独立的，不保存历史记录
 - 使用此文件记录重要的项目信息和开发进度
 - 项目包含完整的 AI 应用开发框架，支持从文档处理到智能问答的全流程
+- 我希望每次回答Eino相关问题时，都要根据https://github.com/cloudwego/eino该github进行
