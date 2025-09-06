@@ -23,17 +23,21 @@
 
 ```
 adk_demo/
-├── main.go                                    # 基础演示程序（简化版）⭐
+├── main.go                                    # 基础工具演示（简化版）
 ├── shared_types.go                            # 共享类型定义
+├── authentic_adk_demo.go                      # 🌟 官方Agent接口真实演示
+├── multi_agent_composition_demo.go            # 🌟 多Agent组合模式演示
+├── resumable_agent_demo.go                    # 🌟 ResumableAgent中断恢复演示
 ├── examples/                                  # 完整演示程序集合
-│   ├── corrected_official_demo.go             # 官方标准工具演示 ⭐
-│   ├── stable_extension_demo.go               # Agent 扩展机制演示（稳定版）⭐
+│   ├── corrected_official_demo.go             # 官方标准工具演示
+│   ├── stable_extension_demo.go               # Agent 扩展机制演示（稳定版）
 │   ├── agent_extension_demo.go                # Agent 扩展机制演示（完整版）
 │   └── working_demo.go                        # 概念演示版本
 ├── go.mod                                     # Go 模块依赖
 ├── go.sum                                     # 依赖校验文件  
 ├── README.md                                  # 本文档
-└── demo_data/                                 # 演示数据目录
+├── Eino_ADK_Guide.md                          # ADK架构完整指南
+└── demo_data/                                 # 演示数据和检查点目录
 ```
 
 ## 快速开始
@@ -47,124 +51,157 @@ go mod tidy
 
 ### 2. 运行演示
 
+#### 🌟 官方ADK架构演示（推荐）
+
 ```bash
-# 🌟 推荐：基础概念演示（简化版，快速入门）
+# 1. 基于官方Agent接口的真实演示 - 核心架构
+go run authentic_adk_demo.go
+
+# 2. 多Agent组合模式演示 - 任务转移、工具化、层次结构
+go run multi_agent_composition_demo.go
+
+# 3. ResumableAgent中断恢复机制 - 企业级可靠性
+go run resumable_agent_demo.go
+```
+
+#### 🔧 基础工具演示
+
+```bash
+# 基础概念演示（简化版，快速入门）
 go run main.go
 
-# 🌟 推荐：官方标准工具演示（基于真实 GitHub 仓库）
+# 官方标准工具演示（InvokableTool接口）
 go run examples/corrected_official_demo.go
 
-# 🌟 推荐：Agent 扩展机制演示（中断与恢复功能）
+# Agent 扩展机制演示（稳定版）
 go run examples/stable_extension_demo.go
-
-# Agent 扩展完整演示（包含更多细节）
-go run examples/agent_extension_demo.go
-
-# 概念演示版本
-go run examples/working_demo.go
 ```
 
 ## 演示内容
 
-### 基础功能测试
-程序会自动运行以下测试用例：
+### 🌟 核心ADK架构特性
 
-1. **数学计算测试**
-   ```
-   用户：帮我计算 25 + 17
-   助理：我帮你计算了表达式 '25 + 17'，计算结果: 42.00
-   ```
+#### 1. Agent抽象接口演示 (authentic_adk_demo.go)
+```
+🤖 Agent标准接口:
+- Name() 和 Description() 元信息方法
+- Run() 异步事件流生成
+- AgentInput 统一输入格式
+- AsyncIterator[*AgentEvent] 流式输出
 
-2. **天气查询测试**
-   ```
-   用户：北京今天天气怎么样？
-   助理：北京的天气：晴天，温度 25°C，微风
-   ```
+📡 事件流示例:
+[15:04:05] MathAgent: 🧮 数学Agent开始处理任务...
+[15:04:05] MathAgent: 💬 我计算了 25 + 17，结果是 42
+[15:04:05] MathAgent: 🎬 动作: exit (数学计算任务完成)
+```
 
-3. **通用对话测试**
-   ```
-   用户：你好，你能做什么？
-   助理：👋 您好！我是智能助理，可以帮您：
-         1. 🧮 数学计算 - 说"计算 2+3"或"帮我算算 10*5"
-         2. 🌤️ 查询天气 - 说"北京天气如何"或"上海的天气"
-   ```
+#### 2. 多Agent组合模式 (multi_agent_composition_demo.go)
+```
+🔧 模式1: Agent作为工具使用
+- 直接调用 Invoke() 方法同步返回结果
 
-### 高级特性演示
+🔄 模式2: Agent间任务转移
+- AgentAction.Type='transfer'
+- 保持执行上下文连续性
 
-#### 基础版 (main.go)
-- **工作流组合**：展示顺序执行（数学分析→结果验证→报告生成）
-- **并行处理**：同时处理多个不同类型的任务
-- **事件追踪**：实时显示 Agent 和工具的执行状态
+🏗️ 模式3: 层次化Agent结构
+- RunPath 显示调用层次: RouterAgent → MathAgent
+- 主Agent协调多个子Agent
+```
 
-#### 官方标准版 (corrected_official_demo.go) ⭐ **工具演示推荐**
-- **真实 InvokableTool 接口**：完全符合官方 GitHub 仓库的接口定义
-- **JSON 数据交换**：标准的参数传递和结果返回格式
-- **完整工具演示**：计算器和天气查询工具的完整实现
-- **错误处理**：包含参数验证、错误响应等完整处理
-- **生产就绪**：所有代码都可以直接用于真实的 ReAct Agent
+#### 3. 中断恢复机制 (resumable_agent_demo.go)
+```
+⏸️  中断流程:
+[15:04:05] DocumentProcessingAgent: ⚠️ 检测到需要人工干预
+[15:04:05] DocumentProcessingAgent: 🎬 动作: interrupt
+[15:04:05] Runner: ⏸️ Runner处理了Agent中断，状态已保存
 
-#### Agent 扩展版 (stable_extension_demo.go) ⭐ **扩展机制推荐**
-- **中断与恢复**：完整的任务中断和断点续传功能
-- **检查点管理**：基于 Gob 编码的高效状态序列化
-- **生命周期管理**：从任务启动到完成的全程状态管理
-- **实际场景模拟**：文档处理任务的真实中断恢复流程
-- **企业级可靠性**：适用于长时间运行的复杂 AI 任务
+🔄 恢复流程:
+[15:04:07] Runner: 🔄 Runner开始恢复会话
+[15:04:07] DocumentProcessingAgent: 📥 从步骤 3 恢复文档处理
+[15:04:07] DocumentProcessingAgent: ✅ 用户确认继续处理
+```
+
+### 🔧 工具系统特性
+
+#### 基础工具演示 (main.go)
+- **简化接口**：展示最基本的工具接口实现
+- **JSON 数据交换**：参数解析和结果返回的标准流程
+- **错误处理**：基本的参数验证和错误响应
+
+#### 官方工具标准 (examples/corrected_official_demo.go)
+- **真实 InvokableTool 接口**：完全符合官方 GitHub 仓库接口定义
+- **生产就绪**：可直接用于 ReAct Agent 的完整实现
+- **完整工具演示**：计算器和天气查询工具的标准实现
+
+### 📚 学习路径建议
+
+1. **ADK入门** (`authentic_adk_demo.go`)
+   - 理解 Agent 接口的核心概念
+   - 掌握异步事件流处理机制
+   - 学习 AgentInput/AgentEvent 数据结构
+
+2. **组合模式** (`multi_agent_composition_demo.go`)
+   - 掌握三种Agent协作模式
+   - 理解任务转移和层次化结构
+   - 学习复杂业务流程的Agent编排
+
+3. **企业应用** (`resumable_agent_demo.go`)
+   - 理解中断恢复的业务价值
+   - 掌握 ResumableAgent 接口设计
+   - 学习 Runner 生命周期管理
+
+4. **工具开发** (`main.go` + `examples/corrected_official_demo.go`)
+   - 从简单到复杂的工具实现
+   - 理解工具与Agent的关系
+   - 掌握生产环境的开发标准
 
 ## 代码架构
 
-### 核心组件（基于真实 Eino GitHub 仓库）
+### 🏗️ 核心ADK架构（基于官方接口）
 
-#### 1. 工具定义（官方 InvokableTool 接口）
+#### 1. Agent抽象接口（官方 Agent 接口）
 ```go
-type CalculatorTool struct{}
-
-// 工具信息定义
-func (c *CalculatorTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
-    params := map[string]*schema.ParameterInfo{
-        "expression": {
-            Type:     schema.String,
-            Desc:     "数学表达式，如 '25+17'",
-            Required: true,
-        },
-    }
-    return &schema.ToolInfo{
-        Name:        "calculator",
-        Desc:        "执行基础数学计算",
-        ParamsOneOf: schema.NewParamsOneOfByParams(params),
-    }, nil
+// 核心Agent接口 - 严格按照官方定义
+type Agent interface {
+    Name(ctx context.Context) string
+    Description(ctx context.Context) string
+    Run(ctx context.Context, input *AgentInput, opts ...AgentRunOption) *AsyncIterator[*AgentEvent]
 }
 
-// 工具执行逻辑
-func (c *CalculatorTool) InvokableRun(ctx context.Context, paramsInJSON string, opts ...tool.Option) (string, error) {
-    // 解析 JSON 参数并执行计算
-    // 返回 JSON 格式的结果
+// Agent输入结构
+type AgentInput struct {
+    Messages        []*Message `json:"messages"`
+    EnableStreaming bool       `json:"enable_streaming,omitempty"`
+}
+
+// Agent事件结构 - 事件驱动架构核心
+type AgentEvent struct {
+    AgentName string         `json:"agent_name"`
+    RunPath   []string      `json:"run_path,omitempty"`
+    Output    interface{}   `json:"output,omitempty"`
+    Action    *AgentAction  `json:"action,omitempty"`
+    Timestamp time.Time     `json:"timestamp"`
 }
 ```
 
-#### 2. ReAct Agent 集成（真实使用方式）
+#### 2. ResumableAgent扩展（官方扩展接口）
 ```go
-// 创建工具列表
-tools := []tool.InvokableTool{
-    &CalculatorTool{},
-    &WeatherTool{},
+// 可恢复Agent接口 - 支持中断恢复
+type ResumableAgent interface {
+    Agent
+    Resume(ctx context.Context, interruptInfo *InterruptInfo, 
+           input *AgentInput, opts ...interface{}) *AsyncIterator[*AgentEvent]
 }
 
-// 创建 ReAct Agent（需要真实的 ChatModel）
-config := &react.AgentConfig{
-    Model: chatModel,  // 来自 eino-ext 的实际模型
-    Tools: tools,
+// Runner生命周期管理 - 官方Runner机制
+type Runner struct {
+    config          *RunnerConfig
+    checkpointStore CheckPointStore
 }
 
-agent, err := react.NewAgent(ctx, config)
-if err != nil {
-    return err
-}
-
-// 运行对话
-messages := []*schema.Message{
-    schema.UserMessage("帮我计算 25 + 17"),
-}
-result, err := agent.Generate(ctx, messages)
+func (r *Runner) Execute(ctx context.Context, agent Agent, input *AgentInput) *AsyncIterator[*AgentEvent]
+func (r *Runner) Resume(ctx context.Context, sessionID string, newInput *AgentInput) *AsyncIterator[*AgentEvent]
 ```
 
 #### 3. 真实项目依赖
@@ -241,42 +278,107 @@ func (d *DemoEventHandler) OnEvent(ctx context.Context, event *callbacks.Event) 
 }
 ```
 
-## 技术特点
+## 🎯 技术特点
 
-### ADK 核心优势
-1. **标准化接口**：统一的 Agent 开发规范
-2. **组合能力**：支持复杂的 Agent 组织结构
-3. **事件系统**：完整的执行过程可观测性
-4. **工具生态**：丰富的工具集成能力
-5. **性能优化**：支持并发和流式处理
+### 🌟 真实ADK架构优势
 
-### 与传统开发方式对比
-- ✅ **快速开发**：标准化组件，减少重复工作
-- ✅ **易于维护**：模块化设计，降低复杂度
-- ✅ **高度复用**：工具和 Agent 可在多个项目间复用
-- ✅ **扩展性强**：插件化架构，轻松添加新功能
+1. **官方接口标准化**
+   - 严格遵循官方 Agent 抽象接口
+   - AgentInput/AgentEvent 标准化数据流
+   - AsyncIterator 异步事件流处理
 
-## 进阶学习
+2. **企业级可靠性**
+   - ResumableAgent 中断恢复机制
+   - Runner 生命周期管理
+   - CheckPointStore 状态持久化
 
-1. **深入了解 ADK 架构**：阅读 `Eino_ADK_Guide.md`
-2. **探索更多组件**：查看其他 Eino 演示项目
-3. **集成真实模型**：连接火山方舟等大语言模型服务
-4. **生产环境部署**：添加日志、监控、错误恢复等功能
+3. **灵活组合能力**
+   - Agent作为工具使用
+   - 任务转移和层次化结构
+   - RunPath 完整调用链追踪
 
-## 常见问题
+4. **事件驱动架构**
+   - 实时事件流处理
+   - AgentAction 标准化动作控制
+   - 松耦合的模块化设计
+
+### 🆚 与传统Agent开发对比
+
+| 特性 | 传统方式 | Eino ADK |
+|------|----------|----------|
+| **接口标准** | 各自实现 | 官方统一接口 |
+| **组合能力** | 硬编码集成 | 灵活的组合模式 |
+| **可靠性** | 基础错误处理 | 中断恢复机制 |
+| **可观测性** | 日志输出 | 结构化事件流 |
+| **扩展性** | 修改核心代码 | 插件化架构 |
+
+## 🚀 进阶学习
+
+### 📖 深度理解ADK
+1. **核心架构**：阅读 `Eino_ADK_Guide.md` 了解架构设计原理
+2. **官方文档**：
+   - [ADK 概述](https://www.cloudwego.io/zh/docs/eino/core_modules/eino_adk/outline/)
+   - [Agent 抽象](https://www.cloudwego.io/zh/docs/eino/core_modules/eino_adk/agent_abstract/)
+   - [Agent 扩展](https://www.cloudwego.io/zh/docs/eino/core_modules/eino_adk/agent_extension/)
+
+### 🏭 生产环境集成
+1. **安装完整框架**：
+   ```bash
+   go get github.com/cloudwego/eino@latest
+   go get github.com/cloudwego/eino-ext@latest
+   ```
+
+2. **集成真实模型**：配置火山方舟等大语言模型服务
+3. **添加监控**：集成日志、指标、链路追踪
+4. **部署优化**：容器化、负载均衡、容错处理
+
+### 🎨 自定义扩展
+1. **实现新Agent**：基于 Agent 接口创建专业领域Agent
+2. **添加新工具**：实现 InvokableTool 接口扩展能力
+3. **定制Runner**：根据业务需求自定义生命周期管理
+4. **扩展存储**：实现 CheckPointStore 接口支持不同存储后端
+
+## ❓ 常见问题
+
+**Q: 这些演示与官方文档有什么对应关系？**
+A: 我们的演示严格基于官方文档实现：
+- `authentic_adk_demo.go` 对应 [Agent 抽象](https://www.cloudwego.io/zh/docs/eino/core_modules/eino_adk/agent_abstract/)
+- `multi_agent_composition_demo.go` 对应 [ADK 概述](https://www.cloudwego.io/zh/docs/eino/core_modules/eino_adk/outline/) 中的组合模式
+- `resumable_agent_demo.go` 对应 [Agent 扩展](https://www.cloudwego.io/zh/docs/eino/core_modules/eino_adk/agent_extension/)
 
 **Q: 如何集成真实的大语言模型？**
-A: 参考 `comprehensive_demo` 中的模型配置，使用火山方舟 API。
+A: 使用 eino-ext 扩展包，配置火山方舟等模型服务：
+```go
+import "github.com/cloudwego/eino-ext/components/model/ark"
+chatModel, err := ark.NewChatModel(ctx, &ark.ChatModelConfig{
+    APIKey: "your-api-key",
+    Model:  "doubao-seed-1-6-250615",
+})
+```
 
-**Q: 可以添加更多工具吗？**
-A: 可以！只需实现 `tool.InvokableTool` 接口即可。
+**Q: Agent与传统工具有什么区别？**
+A: Agent是更高层的抽象：
+- **工具**：实现特定功能，通过 InvokableTool 接口
+- **Agent**：具有推理能力，可以组合多个工具，通过 Agent 接口
 
-**Q: 如何处理复杂的工作流？**
-A: 使用 ADK 的 Workflow 功能，支持顺序、并行、条件执行等模式。
+**Q: 中断恢复机制的实际应用场景？**
+A: 企业级场景中非常重要：
+- 长时间文档处理任务
+- 需要人工审核的业务流程  
+- 跨系统重启的任务持续性
+- 复杂数据分析的断点续传
 
-**Q: 性能如何优化？**
-A: 利用 ADK 的并发能力，合理设计 Agent 职责分工，避免不必要的重复计算。
+**Q: 如何扩展更多Agent类型？**
+A: 实现 Agent 接口即可：
+```go
+type MyCustomAgent struct{}
+func (m *MyCustomAgent) Name(ctx context.Context) string { ... }
+func (m *MyCustomAgent) Description(ctx context.Context) string { ... }
+func (m *MyCustomAgent) Run(ctx context.Context, input *AgentInput, opts ...interface{}) *AsyncIterator[*AgentEvent] { ... }
+```
 
 ---
 
-🎉 **开始你的 AI 智能体开发之旅吧！**
+🎉 **开始你的 Eino ADK 智能体开发之旅！**
+
+🌟 **这就是真正基于官方文档的 Eino ADK 完整演示！**
