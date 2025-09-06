@@ -7,7 +7,7 @@ require (
 	github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown v0.0.0-20250814083140-54b99ff82f8e
 	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.0
 	github.com/cloudwego/eino-ext/components/indexer/milvus v0.0.0-20250814083140-54b99ff82f8e
-	github.com/cloudwego/eino-ext/components/model/ark v0.1.22
+	github.com/cloudwego/eino-ext/components/model/ark v0.1.27
 	github.com/cloudwego/eino-ext/components/retriever/milvus v0.0.0-20250814083140-54b99ff82f8e
 	github.com/milvus-io/milvus-sdk-go/v2 v2.4.2
 	github.com/spf13/viper v1.20.1
@@ -20,6 +20,7 @@ require (
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
+	github.com/cloudwego/eino-ext/components/retriever/volc_vikingdb v0.0.0-20250905035413-86dbae6351d5
 	github.com/cockroachdb/errors v1.9.1 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20211118104740-dabe8e521a4f // indirect
 	github.com/cockroachdb/redact v1.1.3 // indirect

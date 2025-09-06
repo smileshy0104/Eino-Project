@@ -573,7 +573,7 @@ func initPracticalConfig() {
 // 2. 审批工作流 - 展示自动审批和人工审批的中断机制
 // 3. API调用工作流 - 展示批量API调用中的错误处理和重试机制
 // 每个演示都包含完整的中断触发、处理和恢复流程
-func RunPracticalExamplesDemo() {
+func main() {
 	initPracticalConfig()
 	ctx := context.Background()
 
