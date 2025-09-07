@@ -98,17 +98,54 @@ type Agent interface {
 
 #### ChatModelAgent - 对话专家
 
-基于 **ReAct 范式**（Reasoning + Acting），像人类专家一样思考：
+**核心特性**: 基于大语言模型的智能对话Agent，采用 **ReAct 范式**（Reasoning + Acting），实现类似人类专家的思考-行动-观察循环。
 
+**ReAct 工作流程**:
 ```
-思考: 用户要我分析这个数据，我需要先理解数据格式
-行动: 调用数据解析工具
-观察: 数据是 CSV 格式，包含销售记录
-思考: 现在需要计算月度增长率
-行动: 调用统计分析工具
-观察: 增长率为 15%
-结论: 提供完整的分析报告
+1. Think（思考） -> 2. Act（行动） -> 3. Observe（观察） -> 4. Respond（回应）
 ```
+
+**实际运行示例**:
+```
+💭 思考: 用户询问图书推荐，我需要了解用户兴趣并搜索相关书籍
+🎯 行动: 调用用户画像分析工具
+👁 观察: 用户对人工智能技术感兴趣，有一定技术背景
+💭 思考: 基于用户画像，搜索AI相关的技术书籍
+🎯 行动: 调用图书搜索工具，关键词："人工智能"
+👁 观察: 找到《深度学习》、《Python机器学习》等优质书籍
+💬 回应: 为您推荐以下AI技术书籍...
+```
+
+**技术实现要点**:
+- **工具集成**: 通过 `Tools` 配置自动注册可调用工具
+- **流式响应**: 实时输出思考过程，提升用户体验
+- **上下文管理**: 自动维护对话历史和状态
+- **智能决策**: 根据用户输入自主选择合适的工具和策略
+
+**配置示例**:
+```go
+chatAgent, _ := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+    Name:        "BookRecommenderAgent",
+    Description: "图书推荐专家，能够根据用户兴趣推荐相关书籍",
+    Instruction: `你是图书推荐专家，使用ReAct模式：
+    1. Think: 分析用户需求和兴趣
+    2. Act: 调用工具获取信息
+    3. Observe: 分析工具返回结果
+    4. Respond: 提供个性化推荐`,
+    Model: chatModel,
+    Tools: []tool.InvokableTool{
+        &BookSearchTool{},
+        &UserProfileTool{},
+    },
+})
+```
+
+**应用场景**:
+- 智能客服系统
+- 个人助理应用  
+- 专业咨询服务
+- 教育培训平台
+- 内容创作辅助
 
 #### A2AAgent - 响应型智能体
 
@@ -238,39 +275,102 @@ for {
 }
 ```
 
+### ChatModelAgent 实战示例
+
+```go
+// 创建图书推荐专家（展示ReAct模式）
+bookAgent, _ := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+    Name:        "BookRecommenderAgent",
+    Description: "基于ReAct模式的图书推荐专家",
+    Instruction: `你是图书推荐专家，严格按照ReAct模式工作：
+    1. **思考**: 分析用户需求，明确推荐策略
+    2. **行动**: 调用相应工具获取信息
+    3. **观察**: 分析工具结果，评估信息质量
+    4. **回应**: 基于分析结果提供个性化推荐
+    
+    每个步骤都要明确标注，让用户了解推理过程。`,
+    Model: chatModel,
+    Tools: []tool.InvokableTool{
+        &BookSearchTool{},
+        &UserProfileTool{},
+    },
+})
+
+// 执行ReAct推理流程
+agentInput := &adk.AgentInput{
+    Messages: []*schema.Message{{
+        Role:    schema.User,
+        Content: "我对人工智能很感兴趣，能推荐一些相关的技术书籍吗？",
+    }},
+    SessionValues: map[string]interface{}{
+        "user_id":     "user_123",
+        "preferences": []string{"technology", "AI", "programming"},
+    },
+}
+
+// 启动ReAct推理循环
+events := bookAgent.Run(ctx, agentInput)
+
+// 处理流式ReAct输出
+for {
+    event, ok := events.Next()
+    if !ok {
+        break
+    }
+    
+    switch event.Type {
+    case "agent_thinking":
+        fmt.Printf("💭 思考: %s\n", event.Content)
+    case "tool_call_start":
+        fmt.Printf("🎯 行动: 调用%s工具\n", event.ToolName)
+    case "tool_call_end":
+        fmt.Printf("👁 观察: %s\n", event.ToolResult)
+    case "agent_response":
+        fmt.Printf("💬 回应: %s\n", event.Content)
+    }
+}
+```
+
 ### 高级组合使用
 
 ```go
-// 创建专业智能体
+// 创建专业智能体矩阵
 mathExpert, _ := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
     Name:        "MathExpert",
     Description: "数学计算专家，能够执行各种数学运算",
-    Instruction: "你是数学专家，使用工具进行精确计算并提供详细解释",
+    Instruction: "你是数学专家，使用ReAct模式进行精确计算并提供详细解释",
     Model:       chatModel,
     Tools:       []tool.InvokableTool{&CalculatorTool{}},
 })
 
-// 创建路由智能体进行任务分发
+// 创建智能路由Agent
 router, _ := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
     Name:        "RouterAgent", 
-    Description: "智能路由器，分析请求并转发给专门的智能体",
-    Instruction: `分析用户请求类型：
-    - 数学计算 → 转发给 MathExpert
-    - 生活服务 → 转发给 LifeAssistant
+    Description: "智能路由器，基于ReAct模式分析请求并分发任务",
+    Instruction: `你是智能任务路由器，使用ReAct模式：
+    1. 思考: 分析用户请求的类型和复杂度
+    2. 行动: 选择最适合的专业Agent
+    3. 观察: 评估Agent执行结果的质量
+    4. 回应: 整合结果并返回最终答案
+    
+    路由策略:
+    - 数学计算 → MathExpert
+    - 图书推荐 → BookRecommenderAgent  
     - 通用对话 → 直接处理`,
     Model: chatModel,
 })
 
-// 多智能体协作处理
+// 多Agent协作处理
 agentInput := &adk.AgentInput{
     Messages: messages,
     SessionValues: map[string]interface{}{
-        "available_agents": []string{"MathExpert", "LifeAssistant"},
-        "routing_strategy": "intelligent",
+        "available_agents": []Agent{mathExpert, bookAgent},
+        "routing_strategy": "react_based",
+        "quality_threshold": 0.8,
     },
 }
 
-// 启动路由器进行智能分发
+// 启动智能路由和协作
 events := router.Run(ctx, agentInput)
 ```
 
@@ -283,6 +383,9 @@ events := router.Run(ctx, agentInput)
 | 维护成本 | 每个项目独立维护 | 统一框架，降低维护成本 |
 | 扩展性 | 修改困难 | 插拔式扩展 |
 | 团队协作 | 接口不统一，协作困难 | 标准化接口，无缝协作 |
+| 推理透明度 | 黑盒处理，难以调试 | ReAct模式，思考过程可视化 |
+| 工具集成 | 手动编写调用逻辑 | 自动工具注册和智能调用 |
+| 错误处理 | 静默失败，难以定位 | 事件流机制，实时状态监控 |
 
 ## 最佳实践建议
 
@@ -312,10 +415,61 @@ agent := &MyAgent{
 }
 ```
 
-### 4. 性能优化
+### 4. ChatModelAgent 最佳实践
+
+#### ReAct模式优化
+```go
+// ✅ 好：清晰的步骤划分
+Instruction: `严格按照ReAct模式：
+1. **思考**: 分析问题，制定策略
+2. **行动**: 调用必要工具
+3. **观察**: 评估结果质量
+4. **回应**: 整合信息，给出答案`
+
+// ❌ 不好：模糊的指令
+Instruction: "帮助用户解决问题"
+```
+
+#### 工具配置策略
+```go
+// ✅ 好：专门化工具集
+Tools: []tool.InvokableTool{
+    &BookSearchTool{},      // 专门搜索图书
+    &UserProfileTool{},     // 分析用户画像
+}
+
+// ❌ 不好：过多通用工具
+Tools: []tool.InvokableTool{
+    &GenericSearchTool{},   // 功能太宽泛
+    &AllInOneTool{},        // 违反单一职责
+}
+```
+
+#### 事件处理最佳实践
+```go
+// 建议的事件监听模式
+for {
+    event, ok := events.Next()
+    if !ok { break }
+    
+    // 根据事件类型做不同处理
+    switch event.Type {
+    case "agent_thinking":
+        logThinking(event.Content)
+    case "tool_call_start": 
+        metrics.ToolCallStarted(event.ToolName)
+    case "agent_error":
+        handleError(event.Error)
+        // 可选择终止或重试
+    }
+}
+```
+
+### 5. 性能优化
 - 合理使用并行执行
-- 适当的缓存策略
+- 适当的缓存策略  
 - 资源池管理
+- ReAct步骤优化：避免过多无效思考循环
 
 ## 总结
 

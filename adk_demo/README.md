@@ -28,6 +28,9 @@ adk_demo/
 ├── authentic_adk_demo.go                      # 🌟 官方Agent接口真实演示
 ├── multi_agent_composition_demo.go            # 🌟 多Agent组合模式演示
 ├── resumable_agent_demo.go                    # 🌟 ResumableAgent中断恢复演示
+├── chat_model_agent_demo.go                   # 🌟 ChatModelAgent + ReAct模式演示
+├── simplified_react_demo.go                   # 🌟 真实Eino React Agent演示
+├── real_adk_chat_model_demo.go              # 🌟 真实ADK ChatModelAgent演示
 ├── examples/                                  # 完整演示程序集合
 │   ├── corrected_official_demo.go             # 官方标准工具演示
 │   ├── stable_extension_demo.go               # Agent 扩展机制演示（稳定版）
@@ -62,6 +65,15 @@ go run multi_agent_composition_demo.go
 
 # 3. ResumableAgent中断恢复机制 - 企业级可靠性
 go run resumable_agent_demo.go
+
+# 4. ChatModelAgent + ReAct模式演示 - 智能推理链路
+go run chat_model_agent_demo.go
+
+# 5. 真实Eino React Agent演示 - 基于官方API
+go run simplified_react_demo.go
+
+# 6. 真实ADK ChatModelAgent演示 - 最新官方实现
+go run real_adk_chat_model_demo.go
 ```
 
 #### 🔧 基础工具演示
@@ -122,6 +134,67 @@ go run examples/stable_extension_demo.go
 [15:04:07] DocumentProcessingAgent: ✅ 用户确认继续处理
 ```
 
+#### 4. ChatModelAgent + ReAct模式 (chat_model_agent_demo.go)
+```
+🧠 ReAct推理循环:
+📡 [10:40:21] BookRecommenderAgent: 💭 🤔 **思考**: 用户询问AI相关技术书籍，需要分析用户需求...
+📡 [10:40:22] BookRecommenderAgent: 📋 🎯 **行动计划**: 先了解用户画像，再搜索相关图书
+📡 [10:40:22] BookRecommenderAgent: 🔧 调用工具: UserProfileTool
+📡 [10:40:23] BookRecommenderAgent: 👁 📊 **观察结果**: 技术背景用户，对AI理论和实践都有兴趣
+📡 [10:40:23] BookRecommenderAgent: 🔧 调用工具: BookSearchTool (关键词: 人工智能)
+📡 [10:40:24] BookRecommenderAgent: 💬 💫 **最终回应**: 基于您的技术背景，推荐以下AI书籍...
+
+🎯 特性亮点:
+- 透明的思考过程可视化
+- 智能工具选择和调用
+- 流式交互体验
+- 完整的ReAct推理链路
+```
+
+#### 5. 真实Eino React Agent演示 (simplified_react_demo.go)
+```
+🌟 基于官方Eino React API:
+📚 使用 github.com/cloudwego/eino/flow/agent/react
+🤖 集成火山方舟(ARK)大语言模型
+🔧 实现标准的 tool.InvokableTool 接口
+
+🧠 完整ReAct推理流程:
+📡 [11:04:34] ReactBookAgent: 🤔💭 **思考**: 分析用户需求和技术背景...
+📡 [11:04:35] ReactBookAgent: 🎯⚡ **行动**: 调用 UserProfileTool 分析用户画像
+📡 [11:04:35] ReactBookAgent: 👀📊 **观察**: 用户具有扎实编程基础，偏好实践导向学习...
+📡 [11:04:37] ReactBookAgent: 🎯⚡ **行动**: 调用 BookSearchTool 搜索相关书籍
+📡 [11:04:38] ReactBookAgent: 💬🎉 **回应**: 基于分析结果提供个性化推荐...
+
+🎯 特性亮点:
+- 真实的Eino框架集成
+- 支持火山方舟模型(需要API密钥)
+- 智能模拟模式(无API密钥时自动切换)
+- 完整的工具调用链路
+```
+
+#### 6. 真实ADK ChatModelAgent演示 (real_adk_chat_model_demo.go)
+```
+🚀 基于最新官方ADK包:
+📚 使用 github.com/cloudwego/eino/adk
+🤖 真实的 adk.NewChatModelAgent() 实现
+🔧 标准的 adk.ToolsConfig 配置
+
+🧠 完整ChatModelAgent工作流程:
+📡 [11:16:54] BookRecommenderAgent: 🚀🤖 **Agent启动**: 初始化完成，开始处理用户请求
+📡 [11:16:55] BookRecommenderAgent: 🤔💭 **思考阶段**: 分析用户背景和学习目标...
+📡 [11:16:56] BookRecommenderAgent: 🎯⚡ **行动阶段**: 调用 UserProfileTool 深度分析用户画像
+📡 [11:16:57] BookRecommenderAgent: 👀📊 **观察阶段**: 用户画像分析完成，制定推荐策略
+📡 [11:16:58] BookRecommenderAgent: 🎯⚡ **行动阶段**: 调用 BookSearchTool 搜索相关书籍
+📡 [11:17:00] BookRecommenderAgent: 💬🎉 **最终回应**: 提供个性化推荐和学习路径...
+
+🎯 技术亮点:
+- 真实的ADK框架集成 (v0.5.0+)
+- 支持火山方舟模型 (需要API密钥)
+- 完整的事件流处理机制
+- 生产级的工具接口实现  
+- 智能模拟模式 (无API密钥时自动切换)
+```
+
 ### 🔧 工具系统特性
 
 #### 基础工具演示 (main.go)
@@ -136,25 +209,68 @@ go run examples/stable_extension_demo.go
 
 ### 📚 学习路径建议
 
+#### 🎯 推荐学习顺序
+
 1. **ADK入门** (`authentic_adk_demo.go`)
    - 理解 Agent 接口的核心概念
    - 掌握异步事件流处理机制
    - 学习 AgentInput/AgentEvent 数据结构
 
-2. **组合模式** (`multi_agent_composition_demo.go`)
+2. **ChatModelAgent基础** (`chat_model_agent_demo.go`)
+   - 掌握ReAct推理模式 (Think-Act-Observe-Respond)
+   - 理解工具集成和智能调用机制
+   - 学习流式交互和透明推理过程
+   - **为什么排在第二**：ChatModelAgent是最常用的Agent类型，理解ReAct模式对后续学习至关重要
+
+2.5. **真实Eino React集成** (`simplified_react_demo.go`) 
+   - 使用官方 github.com/cloudwego/eino/flow/agent/react
+   - 集成火山方舟(ARK)大语言模型
+   - 实现标准的 tool.InvokableTool 接口
+   - 支持真实模型调用和智能模拟模式
+   - **重要性**：这是产品级的真实实现，展示如何在生产环境中使用Eino
+
+2.8. **最新ADK ChatModelAgent** (`real_adk_chat_model_demo.go`) ⭐**推荐**
+   - 使用最新官方 github.com/cloudwego/eino/adk 包 (v0.5.0+)
+   - 真实的 adk.NewChatModelAgent() 实现
+   - 标准的 adk.ToolsConfig 配置
+   - 完整的事件流处理和错误管理
+   - **为什么最重要**：这是Eino官方提供的最新、最完整的Agent实现方式
+
+3. **组合模式** (`multi_agent_composition_demo.go`)
    - 掌握三种Agent协作模式
    - 理解任务转移和层次化结构
    - 学习复杂业务流程的Agent编排
+   - 将ChatModelAgent应用于多Agent协作场景
 
-3. **企业应用** (`resumable_agent_demo.go`)
+4. **企业应用** (`resumable_agent_demo.go`)
    - 理解中断恢复的业务价值
    - 掌握 ResumableAgent 接口设计
    - 学习 Runner 生命周期管理
+   - 在生产环境中部署ChatModelAgent系统
 
-4. **工具开发** (`main.go` + `examples/corrected_official_demo.go`)
+5. **工具开发** (`main.go` + `examples/corrected_official_demo.go`)
    - 从简单到复杂的工具实现
    - 理解工具与Agent的关系
+   - 为ChatModelAgent开发专门化工具
    - 掌握生产环境的开发标准
+
+#### 🚀 快速上手路径（30分钟）
+```bash
+# 1. 基础概念 (5分钟)
+go run authentic_adk_demo.go
+
+# 2. 智能推理 (10分钟) - 核心重点
+go run chat_model_agent_demo.go  
+
+# 2.5. 真实集成 (5分钟) - 生产级实现
+go run simplified_react_demo.go
+
+# 2.8. 最新ADK (10分钟) - ⭐官方推荐
+go run real_adk_chat_model_demo.go
+
+# 3. 实际应用 (15分钟)
+go run multi_agent_composition_demo.go
+```
 
 ## 代码架构
 
