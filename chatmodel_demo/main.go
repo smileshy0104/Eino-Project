@@ -19,11 +19,9 @@ import (
 
 // 配置结构体
 type Config struct {
-	ARK struct {
-		APIKey  string `mapstructure:"api_key"`
-		Model   string `mapstructure:"model"`
-		BaseURL string `mapstructure:"base_url"`
-	} `mapstructure:"ark"`
+	APIKey  string `mapstructure:"api_key"`
+	Model   string `mapstructure:"model"`
+	BaseURL string `mapstructure:"base_url"`
 }
 
 // 对话管理器
@@ -231,54 +229,32 @@ func (p *PerformanceMonitor) sendMetrics() {
 
 // 初始化配置
 func initConfig() (*Config, error) {
+	// 为了能从 viper 加载配置，先进行初始化
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("./config")
-
-	// 设置默认值
-	viper.SetDefault("ark.model", "doubao-pro-4k")
-	viper.SetDefault("ark.base_url", "")
-
-	// 从环境变量读取
-	viper.SetEnvPrefix("EINO")
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// 尝试读取配置文件
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("读取配置文件失败: %w", err)
-		}
-		fmt.Println("未找到配置文件，使用环境变量和默认值")
-	}
-
-	var config Config
-	if err := viper.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("解析配置失败: %w", err)
-	}
-
-	// 检查必需的配置
-	if config.ARK.APIKey == "" {
-		return nil, fmt.Errorf("ARK API Key 未配置，请设置环境变量 EINO_ARK_API_KEY 或在配置文件中设置")
-	}
-
-	return &config, nil
+	viper.AddConfigPath("./")
+	_ = viper.ReadInConfig() // 忽略错误，因为我们也会检查环境变量
+	return &Config{
+		APIKey:  viper.GetString("ARK_API_KEY"),
+		Model:   viper.GetString("ARK_MODEL"),
+		BaseURL: viper.GetString("BASE_URL"),
+	}, nil
 }
 
 // 初始化ChatModel
 func initChatModel(ctx context.Context, config *Config) (model.BaseChatModel, error) {
 	timeout := 30 * time.Second
 	chatModelConfig := &ark.ChatModelConfig{
-		APIKey:  config.ARK.APIKey,
-		Model:   config.ARK.Model,
+		APIKey:  config.APIKey,
+		Model:   config.Model,
 		Timeout: &timeout,
 	}
 
-	if config.ARK.BaseURL != "" {
-		chatModelConfig.BaseURL = config.ARK.BaseURL
+	if config.BaseURL != "" {
+		chatModelConfig.BaseURL = config.BaseURL
 	}
 
+	// 创建ChatModel
 	cm, err := ark.NewChatModel(ctx, chatModelConfig)
 	if err != nil {
 		return nil, fmt.Errorf("初始化ChatModel失败: %w", err)
@@ -392,6 +368,26 @@ func orchestrationExample(ctx context.Context, cm model.BaseChatModel) {
 	}
 
 	fmt.Printf("链式处理结果: %s\n", result.Content)
+
+	// 3. 在 Graph 中使用
+	graph := compose.NewGraph[[]*schema.Message, *schema.Message]()
+	graph.AddChatModelNode("chat_model", cm)
+
+	// 设置图的流程
+	graph.AddEdge(compose.START, "chat_model")
+	graph.AddEdge("chat_model", compose.END)
+
+	graphRunnable, err := graph.Compile(ctx)
+	if err != nil {
+		log.Fatal("编译图失败:", err)
+	}
+
+	graphResult, err := graphRunnable.Invoke(ctx, messages)
+	if err != nil {
+		log.Fatal("执行图失败:", err)
+	}
+
+	fmt.Printf("图式处理结果: %s\n", graphResult.Content)
 }
 
 // 对话管理示例
@@ -514,7 +510,7 @@ func main() {
 		log.Fatal("配置初始化失败:", err)
 	}
 
-	fmt.Printf("使用模型: %s\n", config.ARK.Model)
+	fmt.Printf("使用模型: %s\n", config.Model)
 
 	// 2. 初始化ChatModel
 	cm, err := initChatModel(ctx, config)
