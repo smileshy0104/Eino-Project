@@ -618,6 +618,41 @@ func toolCallingExample(ctx context.Context, cm model.BaseChatModel) {
 	}
 }
 
+func callbackExample(ctx context.Context, cm model.BaseChatModel) {
+	fmt.Println("\n=== 回调监控示例 ===")
+
+	// 简化的回调示例 - 使用性能监控器代替复杂的回调
+	monitor := NewPerformanceMonitor()
+
+	messages := []*schema.Message{
+		{Role: schema.User, Content: "请介绍一下回调机制的作用。"},
+	}
+
+	// 开始监控
+	monitor.StartMonitoring("doubao-seed-1-6-250615", len(messages))
+
+	// 执行生成
+	response, err := cm.Generate(ctx, messages,
+		model.WithTemperature(0.7),
+		model.WithMaxTokens(500),
+	)
+
+	// 结束监控
+	if err != nil {
+		monitor.EndMonitoring(false, err)
+		log.Printf("生成失败: %v", err)
+		return
+	}
+
+	monitor.EndMonitoring(true, nil)
+	fmt.Printf("生成结果: %s\n", response.Content)
+
+	fmt.Println("\n回调机制说明:")
+	fmt.Println("- 回调可以用于监控模型调用的各个阶段")
+	fmt.Println("- 包括开始、结束、错误和流式数据处理")
+	fmt.Println("- 本示例使用简化的性能监控器演示回调概念")
+}
+
 // 主函数
 func main() {
 	ctx := context.Background()
@@ -672,21 +707,24 @@ func main() {
 			try("性能监控示例", performanceExample)
 		case "tool":
 			try("工具调用示例", toolCallingExample)
+		case "callback":
+			try("回调监控示例", callbackExample)
 		default:
 			fmt.Printf("未知示例: %s\n", exampleName)
-			fmt.Println("可用示例: basic, stream, orchestration, conversation, service, code, performance, tool")
+			fmt.Println("可用示例: basic, stream, orchestration, conversation, service, code, performance, tool, callback")
 			return
 		}
 	} else {
 		// 运行所有示例
-		try("基础使用示例", basicChatModelExample)
-		try("流式生成示例", streamingExample)
-		try("编排使用示例", orchestrationExample)
-		try("多轮对话示例", conversationExample)
-		try("智能客服示例", customerServiceExample)
-		try("代码生成示例", codeGenerationExample)
-		try("性能监控示例", performanceExample)
-		try("工具调用示例", toolCallingExample)
+		//try("基础使用示例", basicChatModelExample)
+		//try("流式生成示例", streamingExample)
+		//try("编排使用示例", orchestrationExample)
+		//try("多轮对话示例", conversationExample)
+		//try("智能客服示例", customerServiceExample)
+		//try("代码生成示例", codeGenerationExample)
+		//try("性能监控示例", performanceExample)
+		//try("工具调用示例", toolCallingExample)
+		try("回调监控示例", callbackExample)
 	}
 
 	fmt.Println("\n🎉 所有示例运行完成！")
@@ -697,5 +735,6 @@ func main() {
 	fmt.Println("  go run main.go conversation # 运行多轮对话示例")
 	fmt.Println("  go run main.go performance  # 运行性能监控示例")
 	fmt.Println("  go run main.go tool         # 运行工具调用示例")
+	fmt.Println("  go run main.go callback     # 运行回调监控示例")
 	fmt.Println("  ... 等等")
 }
