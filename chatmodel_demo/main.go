@@ -3,19 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/eino-ext/components/model/ark"
+	"github.com/cloudwego/eino/callbacks"
+	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/schema"
+	"github.com/spf13/viper"
 	"io"
 	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/cloudwego/eino-ext/components/model/ark"
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
-	"github.com/spf13/viper"
 )
 
 // 配置结构体
@@ -618,39 +618,195 @@ func toolCallingExample(ctx context.Context, cm model.BaseChatModel) {
 	}
 }
 
-func callbackExample(ctx context.Context, cm model.BaseChatModel) {
-	fmt.Println("\n=== 回调监控示例 ===")
+// 自定义回调处理器
+type ChatModelCallbackHandler struct {
+	startTime time.Time
+	requestID string
+}
 
-	// 简化的回调示例 - 使用性能监控器代替复杂的回调
-	monitor := NewPerformanceMonitor()
+// 生成请求开始时的回调
+func (h *ChatModelCallbackHandler) OnGenerateStart(ctx context.Context, messages []*schema.Message) {
+	h.startTime = time.Now()
+	h.requestID = fmt.Sprintf("req_%d", time.Now().UnixNano())
+	fmt.Printf("[回调] 🚀 开始生成 (ID: %s)\n", h.requestID)
+	fmt.Printf("[回调] 📝 消息数量: %d\n", len(messages))
+	for i, msg := range messages {
+		fmt.Printf("[回调]   消息%d [%s]: %s\n", i+1, msg.Role,
+			truncateString(msg.Content, 50))
+	}
+}
 
-	messages := []*schema.Message{
-		{Role: schema.User, Content: "请介绍一下回调机制的作用。"},
+// 生成请求成功时的回调
+func (h *ChatModelCallbackHandler) OnGenerateSuccess(ctx context.Context, response *schema.Message) {
+	duration := time.Since(h.startTime)
+	fmt.Printf("[回调] ✅ 生成成功 (ID: %s)\n", h.requestID)
+	fmt.Printf("[回调] ⏱️ 耗时: %v\n", duration)
+	fmt.Printf("[回调] 📤 响应长度: %d 字符\n", len(response.Content))
+
+	// 如果有使用统计信息，显示
+	if response.ResponseMeta != nil && response.ResponseMeta.Usage != nil {
+		usage := response.ResponseMeta.Usage
+		fmt.Printf("[回调] 🔢 Token使用: 输入=%d, 输出=%d, 总计=%d\n",
+			usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens)
+	}
+}
+
+// 生成请求失败时的回调
+func (h *ChatModelCallbackHandler) OnGenerateError(ctx context.Context, err error) {
+	duration := time.Since(h.startTime)
+	fmt.Printf("[回调] ❌ 生成失败 (ID: %s)\n", h.requestID)
+	fmt.Printf("[回调] ⏱️ 耗时: %v\n", duration)
+	fmt.Printf("[回调] 💥 错误: %v\n", err)
+}
+
+// 流式数据接收时的回调
+func (h *ChatModelCallbackHandler) OnStreamChunk(ctx context.Context, chunk string) {
+	fmt.Printf("[回调] 🔄 流式数据: %s", chunk)
+}
+
+// 字符串截断工具函数
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
+// 简化的回调执行函数
+func executeWithCallback(handler *ChatModelCallbackHandler, ctx context.Context, messages []*schema.Message, cm model.BaseChatModel, opts ...model.Option) (*schema.Message, error) {
+	// 调用开始回调
+	handler.OnGenerateStart(ctx, messages)
+
+	// 执行实际生成
+	response, err := cm.Generate(ctx, messages, opts...)
+
+	// 根据结果调用相应回调
+	if err != nil {
+		handler.OnGenerateError(ctx, err)
+		return nil, err
 	}
 
-	// 开始监控
-	monitor.StartMonitoring("doubao-seed-1-6-250615", len(messages))
+	handler.OnGenerateSuccess(ctx, response)
+	return response, nil
+}
 
-	// 执行生成
-	response, err := cm.Generate(ctx, messages,
-		model.WithTemperature(0.7),
-		model.WithMaxTokens(500),
-	)
+// 简化的流式回调执行函数
+func executeStreamWithCallback(handler *ChatModelCallbackHandler, ctx context.Context, messages []*schema.Message, cm model.BaseChatModel, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	// 调用开始回调
+	handler.OnGenerateStart(ctx, messages)
 
-	// 结束监控
+	// 执行实际流式生成
+	streamResult, err := cm.Stream(ctx, messages, opts...)
 	if err != nil {
-		monitor.EndMonitoring(false, err)
-		log.Printf("生成失败: %v", err)
+		handler.OnGenerateError(ctx, err)
+		return nil, err
+	}
+
+	return streamResult, nil
+}
+
+func callbackExample(ctx context.Context, cm model.BaseChatModel) {
+	fmt.Println("\n=== Eino 官方回调系统示例 ===")
+	fmt.Println("演示如何使用 Eino 官方回调机制监控ChatModel的调用过程")
+
+	// 1. 创建 Eino 官方回调处理器 - 使用 HandlerBuilder
+	callbackHandler := callbacks.NewHandlerBuilder().
+		OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+			fmt.Printf("[官方回调] 🚀 组件开始执行\n")
+			fmt.Printf("[官方回调] 📝 输入数据: %v\n", truncateString(fmt.Sprintf("%v", input), 100))
+			return ctx
+		}).
+		OnEndFn(func(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+			fmt.Printf("[官方回调] ✅ 组件执行完成\n")
+			fmt.Printf("[官方回调] 📤 输出数据: %s\n", truncateString(fmt.Sprintf("%v", output), 100))
+			return ctx
+		}).
+		OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+			fmt.Printf("[官方回调] ❌ 组件执行失败: %v\n", err)
+			return ctx
+		}).
+		Build()
+
+	// 2. 基础生成示例 - 使用 Chain 集成回调
+	fmt.Println("\n--- 使用 Chain 的回调示例 ---")
+	messages := []*schema.Message{
+		{Role: schema.System, Content: "你是一个友好的AI助手。"},
+		{Role: schema.User, Content: "请简单介绍一下回调机制在软件开发中的作用。"},
+	}
+
+	// 创建带回调的 Chain
+	chain := compose.NewChain[[]*schema.Message, *schema.Message]()
+	chain.AppendChatModel(cm)
+
+	runnable, err := chain.Compile(ctx)
+	if err != nil {
+		log.Printf("编译 Chain 失败: %v", err)
 		return
 	}
 
-	monitor.EndMonitoring(true, nil)
-	fmt.Printf("生成结果: %s\n", response.Content)
+	// 使用回调执行
+	response, err := runnable.Invoke(ctx, messages,
+		compose.WithCallbacks(callbackHandler),
+	)
 
-	fmt.Println("\n回调机制说明:")
-	fmt.Println("- 回调可以用于监控模型调用的各个阶段")
-	fmt.Println("- 包括开始、结束、错误和流式数据处理")
-	fmt.Println("- 本示例使用简化的性能监控器演示回调概念")
+	if err != nil {
+		log.Printf("Chain 执行失败: %v", err)
+		// 继续执行自定义回调示例
+		fmt.Println("\n--- 备用自定义回调示例 ---")
+		customHandler := &ChatModelCallbackHandler{}
+		executeWithCallback(customHandler, ctx, messages, cm,
+			model.WithTemperature(0.7),
+			model.WithMaxTokens(300),
+		)
+		return
+	}
+
+	fmt.Printf("\n📄 Chain 响应: %s\n", response.Content)
+
+	// 3. Graph 回调示例
+	fmt.Println("\n--- 使用 Graph 的回调示例 ---")
+	graph := compose.NewGraph[[]*schema.Message, *schema.Message]()
+	graph.AddChatModelNode("chat", cm)
+	graph.AddEdge(compose.START, "chat")
+	graph.AddEdge("chat", compose.END)
+
+	graphRunnable, err := graph.Compile(ctx)
+	if err != nil {
+		log.Printf("编译 Graph 失败: %v", err)
+		return
+	}
+
+	graphResponse, err := graphRunnable.Invoke(ctx, messages,
+		compose.WithCallbacks(callbackHandler),
+	)
+
+	if err != nil {
+		log.Printf("Graph 执行失败: %v", err)
+		return
+	}
+
+	fmt.Printf("\n📄 Graph 响应: %s\n", graphResponse.Content)
+
+	// 4. 演示错误回调
+	fmt.Println("\n--- 错误处理回调示例 ---")
+	errorMessages := []*schema.Message{
+		{Role: schema.User, Content: strings.Repeat("测试超长文本", 500)},
+	}
+
+	_, err = runnable.Invoke(ctx, errorMessages,
+		compose.WithCallbacks(callbackHandler),
+	)
+
+	if err != nil {
+		fmt.Printf("✅ 错误回调成功触发，这是预期的行为\n")
+	}
+
+	fmt.Println("\n📝 Eino 官方回调机制总结:")
+	fmt.Println("✅ 使用 callbacks.NewHandlerBuilder() 创建回调处理器")
+	fmt.Println("✅ 支持 OnChatModelStart、OnChatModelEnd、OnChatModelError 等事件")
+	fmt.Println("✅ 可以与 Chain 和 Graph 无缝集成")
+	fmt.Println("✅ 提供标准化的回调接口和数据结构")
+	fmt.Println("🎯 Eino 官方回调系统更加稳定和功能完整")
 }
 
 // 主函数
