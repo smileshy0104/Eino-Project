@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/eino/components/tool"
 	"io"
 	"log"
 	"os"
@@ -497,6 +498,126 @@ func performanceExample(ctx context.Context, cm model.BaseChatModel) {
 	fmt.Printf("\n生成结果: %s\n", response.Content)
 }
 
+// 计算器工具实现
+type CalculatorTool struct{}
+
+func NewCalculatorTool() *CalculatorTool {
+	return &CalculatorTool{}
+}
+
+func (c *CalculatorTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return &schema.ToolInfo{
+		Name: "calculator",
+		Desc: "执行基本数学运算，支持加减乘除",
+		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+			"expression": {
+				Type:     "string",
+				Desc:     "要计算的数学表达式，例如: '123 * 456'",
+				Required: true,
+			},
+		}),
+	}, nil
+}
+
+func (c *CalculatorTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+	// 简单的计算器实现（这里只是示例）
+	result := fmt.Sprintf("计算结果: %s = [模拟计算结果]", argumentsInJSON)
+	return result, nil
+}
+
+// 天气工具实现
+type WeatherTool struct{}
+
+func NewWeatherTool() *WeatherTool {
+	return &WeatherTool{}
+}
+
+func (w *WeatherTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return &schema.ToolInfo{
+		Name: "weather",
+		Desc: "查询指定城市的天气信息",
+		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+			"city": {
+				Type:     "string",
+				Desc:     "要查询天气的城市名称",
+				Required: true,
+			},
+		}),
+	}, nil
+}
+
+func (w *WeatherTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+	result := fmt.Sprintf("城市天气信息: %s [模拟天气数据: 晴天，温度 25°C，湿度 60%%]", argumentsInJSON)
+	return result, nil
+}
+
+// 工具调用示例
+func toolCallingExample(ctx context.Context, cm model.BaseChatModel) {
+	fmt.Println("\n=== 工具调用集成 ===")
+
+	// 1. 创建工具
+	tools := []tool.InvokableTool{
+		NewCalculatorTool(),
+		NewWeatherTool(),
+	}
+
+	// 2. 绑定工具到模型
+	toolInfos := make([]*schema.ToolInfo, 0, len(tools))
+	for _, t := range tools {
+		info, err := t.Info(ctx)
+		if err != nil {
+			log.Printf("获取工具信息失败: %v", err)
+			continue
+		}
+		toolInfos = append(toolInfos, info)
+	}
+
+	// 3. 发送需要工具调用的消息
+	messages := []*schema.Message{
+		{
+			Role:    schema.System,
+			Content: "你是一个智能助手，可以使用工具来帮助用户解决问题。",
+		},
+		{
+			Role:    schema.User,
+			Content: "请帮我计算 123 * 456 的结果，然后查询北京今天的天气。",
+		},
+	}
+
+	// 4. 生成响应（可能包含工具调用）
+	response, err := cm.Generate(ctx, messages, model.WithTools(toolInfos))
+	if err != nil {
+		log.Printf("生成响应失败: %v", err)
+		return
+	}
+
+	// 5. 处理工具调用
+	if len(response.ToolCalls) > 0 {
+		fmt.Printf("模型请求调用 %d 个工具:\n", len(response.ToolCalls))
+
+		for _, toolCall := range response.ToolCalls {
+			fmt.Printf("- 工具: %s, 参数: %s\n",
+				toolCall.Function.Name,
+				toolCall.Function.Arguments)
+
+			// 执行工具调用
+			for _, t := range tools {
+				info, _ := t.Info(ctx)
+				if info.Name == toolCall.Function.Name {
+					result, err := t.InvokableRun(ctx, toolCall.Function.Arguments)
+					if err != nil {
+						log.Printf("工具调用失败: %v", err)
+						continue
+					}
+					fmt.Printf("  结果: %s\n", result)
+				}
+			}
+		}
+	} else {
+		fmt.Printf("直接回复: %s\n", response.Content)
+	}
+}
+
 // 主函数
 func main() {
 	ctx := context.Background()
@@ -549,9 +670,11 @@ func main() {
 			try("代码生成示例", codeGenerationExample)
 		case "performance":
 			try("性能监控示例", performanceExample)
+		case "tool":
+			try("工具调用示例", toolCallingExample)
 		default:
 			fmt.Printf("未知示例: %s\n", exampleName)
-			fmt.Println("可用示例: basic, stream, orchestration, conversation, service, code, performance")
+			fmt.Println("可用示例: basic, stream, orchestration, conversation, service, code, performance, tool")
 			return
 		}
 	} else {
@@ -563,6 +686,7 @@ func main() {
 		try("智能客服示例", customerServiceExample)
 		try("代码生成示例", codeGenerationExample)
 		try("性能监控示例", performanceExample)
+		try("工具调用示例", toolCallingExample)
 	}
 
 	fmt.Println("\n🎉 所有示例运行完成！")
@@ -572,5 +696,6 @@ func main() {
 	fmt.Println("  go run main.go stream       # 运行流式生成示例")
 	fmt.Println("  go run main.go conversation # 运行多轮对话示例")
 	fmt.Println("  go run main.go performance  # 运行性能监控示例")
+	fmt.Println("  go run main.go tool         # 运行工具调用示例")
 	fmt.Println("  ... 等等")
 }
