@@ -432,48 +432,58 @@ func toolCallingExample() {
 
 ## 📊 回调机制 (Callbacks)
 
-回调机制允许开发者在 `ChatModel` 的生命周期关键点注入自定义逻辑，用于**监控**、**日志记录**和**性能分析**。
+Eino 提供了强大的回调机制，允许开发者在组件执行的关键点注入自定义逻辑，用于**监控**、**日志记录**、**性能分析**和**错误处理**。
 
 ### 回调事件
 
-- **`OnStart`**: 在模型开始生成时触发
-- **`OnEnd`**: 在模型成功生成响应后触发
-- **`OnError`**: 在发生错误时触发
-- **`OnStream`**: 在流式生成过程中触发（每个chunk）
+Eino 使用 `callbacks.NewHandlerBuilder()` 创建回调处理器，支持以下事件：
+
+- **`OnStartFn`**: 在组件开始执行时触发，接收输入数据
+- **`OnEndFn`**: 在组件成功执行后触发，接收输出数据
+- **`OnErrorFn`**: 在发生错误时触发，接收错误信息
+- **`OnStartWithStreamInputFn`**: 处理流式输入的开始事件
+- **`OnEndWithStreamOutputFn`**: 处理流式输出的结束事件
+
+### 核心特性
+
+- **通用性**: 支持所有 Eino 组件 (ChatModel, Chain, Graph, Tools 等)
+- **标准化**: 统一的回调接口和数据结构
+- **灵活性**: 可以组合多个回调处理器
+- **性能友好**: 轻量级回调机制，不影响主要业务逻辑
 
 ### 使用示例
 
 ```go
 import "github.com/cloudwego/eino/callbacks"
 
-func callbackExample() {
-    ctx := context.Background()
-    
-    // 1. 创建回调处理器
-    handler := &callbacks.ChatModelCallbackHandler{
-        OnStart: func(ctx context.Context, info *callbacks.ChatModelStartInfo) {
-            fmt.Printf("[回调] 开始生成，模型: %s, 消息数: %d\n", 
-                info.Model, len(info.Messages))
-        },
-        OnEnd: func(ctx context.Context, info *callbacks.ChatModelEndInfo) {
-            fmt.Printf("[回调] 生成完成，耗时: %v, Token使用: %d\n", 
-                info.Duration, info.TokenUsage.TotalTokens)
-        },
-        OnError: func(ctx context.Context, info *callbacks.ChatModelErrorInfo) {
-            fmt.Printf("[回调] 生成失败: %v\n", info.Error)
-        },
-        OnStream: func(ctx context.Context, info *callbacks.ChatModelStreamInfo) {
-            fmt.Printf("[回调] 流式数据: %s\n", info.Chunk.Content)
-        },
-    }
-    
-    callbackHandler := callbacks.NewHandlerHelper().ChatModel(handler).Handler()
+func callbackExample(ctx context.Context, cm model.BaseChatModel) {
+    // 1. 创建 Eino 官方回调处理器
+    callbackHandler := callbacks.NewHandlerBuilder().
+        OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+            fmt.Printf("[官方回调] 🚀 组件开始执行\n")
+            fmt.Printf("[官方回调] 📝 输入数据长度: %d\n", len(fmt.Sprintf("%v", input)))
+            return ctx
+        }).
+        OnEndFn(func(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+            fmt.Printf("[官方回调] ✅ 组件执行完成\n")
+            fmt.Printf("[官方回调] 📤 输出数据长度: %d\n", len(fmt.Sprintf("%v", output)))
+            return ctx
+        }).
+        OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+            fmt.Printf("[官方回调] ❌ 组件执行失败: %v\n", err)
+            return ctx
+        }).
+        Build()
     
     // 2. 在编排中使用回调
     chain := compose.NewChain[[]*schema.Message, *schema.Message]()
     chain.AppendChatModel(cm)
     
-    runnable, _ := chain.Compile(ctx)
+    runnable, err := chain.Compile(ctx)
+    if err != nil {
+        log.Printf("编译 Chain 失败: %v", err)
+        return
+    }
     
     messages := []*schema.Message{
         {Role: schema.User, Content: "你好！"},
@@ -499,36 +509,85 @@ func callbackExample() {
 type PerformanceMonitor struct {
     startTime time.Time
     metrics   map[string]interface{}
+    mu        sync.RWMutex
 }
 
-func (p *PerformanceMonitor) CreateHandler() *callbacks.ChatModelCallbackHandler {
-    return &callbacks.ChatModelCallbackHandler{
-        OnStart: func(ctx context.Context, info *callbacks.ChatModelStartInfo) {
+func NewPerformanceMonitor() *PerformanceMonitor {
+    return &PerformanceMonitor{
+        metrics: make(map[string]interface{}),
+    }
+}
+
+func (p *PerformanceMonitor) CreateHandler() callbacks.Handler {
+    return callbacks.NewHandlerBuilder().
+        OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+            p.mu.Lock()
+            defer p.mu.Unlock()
+            
             p.startTime = time.Now()
             p.metrics = make(map[string]interface{})
-            p.metrics["model"] = info.Model
-            p.metrics["input_messages"] = len(info.Messages)
-        },
-        OnEnd: func(ctx context.Context, info *callbacks.ChatModelEndInfo) {
+            p.metrics["component_type"] = "chatmodel"
+            p.metrics["input_size"] = len(fmt.Sprintf("%v", input))
+            
+            fmt.Printf("[性能监控] 开始执行，输入大小: %d\n", p.metrics["input_size"])
+            return ctx
+        }).
+        OnEndFn(func(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+            p.mu.Lock()
+            defer p.mu.Unlock()
+            
             duration := time.Since(p.startTime)
             p.metrics["duration_ms"] = duration.Milliseconds()
-            p.metrics["total_tokens"] = info.TokenUsage.TotalTokens
-            p.metrics["tokens_per_second"] = float64(info.TokenUsage.TotalTokens) / duration.Seconds()
+            p.metrics["output_size"] = len(fmt.Sprintf("%v", output))
+            p.metrics["status"] = "success"
             
-            // 发送到监控系统
+            // 计算处理速度
+            if duration.Seconds() > 0 {
+                p.metrics["chars_per_second"] = float64(p.metrics["output_size"].(int)) / duration.Seconds()
+            }
+            
             p.sendMetrics()
-        },
-        OnError: func(ctx context.Context, info *callbacks.ChatModelErrorInfo) {
-            p.metrics["error"] = info.Error.Error()
+            return ctx
+        }).
+        OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+            p.mu.Lock()
+            defer p.mu.Unlock()
+            
+            duration := time.Since(p.startTime)
+            p.metrics["duration_ms"] = duration.Milliseconds()
+            p.metrics["error"] = err.Error()
             p.metrics["status"] = "failed"
+            
             p.sendMetrics()
-        },
-    }
+            return ctx
+        }).
+        Build()
 }
 
 func (p *PerformanceMonitor) sendMetrics() {
     // 发送指标到监控系统（如 Prometheus、DataDog 等）
-    fmt.Printf("性能指标: %+v\n", p.metrics)
+    fmt.Printf("[性能指标] %+v\n", p.metrics)
+}
+
+// 使用示例
+func performanceMonitorExample(ctx context.Context, cm model.BaseChatModel) {
+    monitor := NewPerformanceMonitor()
+    handler := monitor.CreateHandler()
+    
+    chain := compose.NewChain[[]*schema.Message, *schema.Message]()
+    chain.AppendChatModel(cm)
+    
+    runnable, _ := chain.Compile(ctx)
+    
+    messages := []*schema.Message{
+        {Role: schema.User, Content: "解释一下人工智能的工作原理"},
+    }
+    
+    // 使用性能监控执行
+    _, err := runnable.Invoke(ctx, messages, compose.WithCallbacks(handler))
+    if err != nil {
+        log.Printf("执行失败: %v", err)
+    }
 }
 ```
 

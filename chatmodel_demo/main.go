@@ -705,24 +705,94 @@ func executeStreamWithCallback(handler *ChatModelCallbackHandler, ctx context.Co
 	return streamResult, nil
 }
 
+// 回调监控示例
 func callbackExample(ctx context.Context, cm model.BaseChatModel) {
 	fmt.Println("\n=== Eino 官方回调系统示例 ===")
 	fmt.Println("演示如何使用 Eino 官方回调机制监控ChatModel的调用过程")
 
-	// 1. 创建 Eino 官方回调处理器 - 使用 HandlerBuilder
+	// 1. 创建增强版 Eino 回调处理器 - 集成性能监控、日志记录、错误统计
+	startTime := time.Now()
+	requestCount := 0
+	errorCount := 0
+
 	callbackHandler := callbacks.NewHandlerBuilder().
 		OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
-			fmt.Printf("[官方回调] 🚀 组件开始执行\n")
-			fmt.Printf("[官方回调] 📝 输入数据: %v\n", truncateString(fmt.Sprintf("%v", input), 100))
+			requestCount++
+			startTime = time.Now()
+
+			fmt.Printf("[增强回调] 🚀 第%d个请求开始执行\n", requestCount)
+			fmt.Printf("[增强回调] ⏰ 开始时间: %s\n", startTime.Format("15:04:05.000"))
+
+			// 分析输入数据
+			inputStr := fmt.Sprintf("%v", input)
+			inputSize := len(inputStr)
+			fmt.Printf("[增强回调] 📊 输入分析: 大小=%d字符\n", inputSize)
+
+			// 截断显示输入内容
+			if inputSize > 150 {
+				fmt.Printf("[增强回调] 📝 输入内容: %s...[截断]\n", inputStr[:150])
+			} else {
+				fmt.Printf("[增强回调] 📝 输入内容: %s\n", inputStr)
+			}
+
 			return ctx
 		}).
 		OnEndFn(func(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
-			fmt.Printf("[官方回调] ✅ 组件执行完成\n")
-			fmt.Printf("[官方回调] 📤 输出数据: %s\n", truncateString(fmt.Sprintf("%v", output), 100))
+			duration := time.Since(startTime)
+
+			fmt.Printf("[增强回调] ✅ 请求成功完成\n")
+			fmt.Printf("[增强回调] ⏱️ 执行耗时: %v\n", duration)
+			fmt.Printf("[增强回调] 🏎️ 平均速度: %.2f ms/请求\n",
+				float64(duration.Milliseconds()))
+
+			// 分析输出数据
+			outputStr := fmt.Sprintf("%v", output)
+			outputSize := len(outputStr)
+			fmt.Printf("[增强回调] 📊 输出分析: 大小=%d字符\n", outputSize)
+
+			// 计算处理效率
+			if duration.Seconds() > 0 {
+				charPerSec := float64(outputSize) / duration.Seconds()
+				fmt.Printf("[增强回调] 📈 处理效率: %.2f字符/秒\n", charPerSec)
+			}
+
+			// 截断显示输出内容
+			if outputSize > 100 {
+				fmt.Printf("[增强回调] 📤 输出内容: %s...[截断]\n", outputStr[:100])
+			} else {
+				fmt.Printf("[增强回调] 📤 输出内容: %s\n", outputStr)
+			}
+
+			// 统计信息
+			fmt.Printf("[增强回调] 📊 会话统计: 总请求=%d, 成功率=%.1f%%\n",
+				requestCount, float64(requestCount-errorCount)*100/float64(requestCount))
+
 			return ctx
 		}).
 		OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
-			fmt.Printf("[官方回调] ❌ 组件执行失败: %v\n", err)
+			duration := time.Since(startTime)
+			errorCount++
+
+			fmt.Printf("[增强回调] ❌ 请求执行失败\n")
+			fmt.Printf("[增强回调] ⏱️ 失败耗时: %v\n", duration)
+			fmt.Printf("[增强回调] 💥 错误详情: %v\n", err)
+
+			// 错误分类
+			errorMsg := err.Error()
+			if strings.Contains(errorMsg, "timeout") {
+				fmt.Printf("[增强回调] 🔍 错误类型: 超时错误\n")
+			} else if strings.Contains(errorMsg, "token") {
+				fmt.Printf("[增强回调] 🔍 错误类型: 认证/Token错误\n")
+			} else if strings.Contains(errorMsg, "rate limit") {
+				fmt.Printf("[增强回调] 🔍 错误类型: 频率限制\n")
+			} else {
+				fmt.Printf("[增强回调] 🔍 错误类型: 其他错误\n")
+			}
+
+			// 统计信息
+			fmt.Printf("[增强回调] 📊 错误统计: 总请求=%d, 错误数=%d, 成功率=%.1f%%\n",
+				requestCount, errorCount, float64(requestCount-errorCount)*100/float64(requestCount))
+
 			return ctx
 		}).
 		Build()
@@ -809,6 +879,237 @@ func callbackExample(ctx context.Context, cm model.BaseChatModel) {
 	fmt.Println("🎯 Eino 官方回调系统更加稳定和功能完整")
 }
 
+// 高级回调处理器 - 包含详细的监控和分析功能
+func advancedCallbackExample(ctx context.Context, cm model.BaseChatModel) {
+	fmt.Println("\n=== 高级回调处理器示例 ===")
+	fmt.Println("演示带有详细监控、日志记录和性能分析的回调处理器")
+
+	// 创建会话级别的统计数据
+	sessionStats := struct {
+		startTime      time.Time
+		requestCount   int
+		successCount   int
+		errorCount     int
+		totalDuration  time.Duration
+		averageLatency time.Duration
+		maxLatency     time.Duration
+		minLatency     time.Duration
+		mu             sync.RWMutex
+	}{
+		startTime:  time.Now(),
+		minLatency: time.Hour, // 初始化为很大的值
+	}
+
+	// 创建高级回调处理器
+	advancedHandler := callbacks.NewHandlerBuilder().
+		OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+			sessionStats.mu.Lock()
+			sessionStats.requestCount++
+			currentReq := sessionStats.requestCount
+			sessionStats.mu.Unlock()
+
+			fmt.Printf("\n[高级回调] 🎯 === 请求 #%d 开始 ===\n", currentReq)
+			fmt.Printf("[高级回调] 📅 时间戳: %s\n", time.Now().Format("2006-01-02 15:04:05.000"))
+
+			// 详细的输入分析
+			inputStr := fmt.Sprintf("%v", input)
+			inputSize := len(inputStr)
+			wordCount := len(strings.Fields(inputStr))
+
+			fmt.Printf("[高级回调] 📊 输入统计:\n")
+			fmt.Printf("[高级回调]   - 总字符数: %d\n", inputSize)
+			fmt.Printf("[高级回调]   - 单词数量: %d\n", wordCount)
+			fmt.Printf("[高级回调]   - 平均单词长度: %.1f\n", float64(inputSize)/float64(wordCount))
+
+			// 内容复杂度分析
+			complexity := "简单"
+			if inputSize > 500 {
+				complexity = "复杂"
+			} else if inputSize > 200 {
+				complexity = "中等"
+			}
+			fmt.Printf("[高级回调]   - 内容复杂度: %s\n", complexity)
+
+			return ctx
+		}).
+		OnEndFn(func(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+			endTime := time.Now()
+			duration := endTime.Sub(sessionStats.startTime)
+
+			sessionStats.mu.Lock()
+			sessionStats.successCount++
+			sessionStats.totalDuration += duration
+			sessionStats.averageLatency = sessionStats.totalDuration / time.Duration(sessionStats.successCount)
+
+			if duration > sessionStats.maxLatency {
+				sessionStats.maxLatency = duration
+			}
+			if duration < sessionStats.minLatency {
+				sessionStats.minLatency = duration
+			}
+
+			currentSuccess := sessionStats.successCount
+			currentReq := sessionStats.requestCount
+			sessionStats.mu.Unlock()
+
+			fmt.Printf("\n[高级回调] ✨ === 请求 #%d 成功完成 ===\n", currentReq)
+			fmt.Printf("[高级回调] ⏱️ 性能指标:\n")
+			fmt.Printf("[高级回调]   - 执行耗时: %v\n", duration)
+			fmt.Printf("[高级回调]   - 平均延迟: %v\n", sessionStats.averageLatency)
+			fmt.Printf("[高级回调]   - 最大延迟: %v\n", sessionStats.maxLatency)
+			fmt.Printf("[高级回调]   - 最小延迟: %v\n", sessionStats.minLatency)
+
+			// 输出分析
+			outputStr := fmt.Sprintf("%v", output)
+			outputSize := len(outputStr)
+			outputWords := len(strings.Fields(outputStr))
+
+			fmt.Printf("[高级回调] 📊 输出统计:\n")
+			fmt.Printf("[高级回调]   - 响应字符数: %d\n", outputSize)
+			fmt.Printf("[高级回调]   - 响应单词数: %d\n", outputWords)
+
+			// 处理效率
+			if duration.Seconds() > 0 {
+				wps := float64(outputWords) / duration.Seconds()
+				cps := float64(outputSize) / duration.Seconds()
+				fmt.Printf("[高级回调]   - 处理速度: %.1f单词/秒, %.1f字符/秒\n", wps, cps)
+			}
+
+			// 质量评估
+			quality := "良好"
+			if outputSize > 1000 {
+				quality = "详细"
+			} else if outputSize < 50 {
+				quality = "简洁"
+			}
+			fmt.Printf("[高级回调]   - 响应质量: %s\n", quality)
+
+			// 会话统计
+			successRate := float64(currentSuccess) * 100 / float64(currentReq)
+			fmt.Printf("[高级回调] 📈 会话统计:\n")
+			fmt.Printf("[高级回调]   - 总请求数: %d\n", currentReq)
+			fmt.Printf("[高级回调]   - 成功率: %.1f%%\n", successRate)
+			fmt.Printf("[高级回调]   - 会话时长: %v\n", endTime.Sub(sessionStats.startTime))
+
+			return ctx
+		}).
+		OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+			endTime := time.Now()
+			duration := endTime.Sub(sessionStats.startTime)
+
+			sessionStats.mu.Lock()
+			sessionStats.errorCount++
+			currentError := sessionStats.errorCount
+			currentReq := sessionStats.requestCount
+			sessionStats.mu.Unlock()
+
+			fmt.Printf("\n[高级回调] 🚨 === 请求 #%d 执行失败 ===\n", currentReq)
+			fmt.Printf("[高级回调] ⏱️ 失败耗时: %v\n", duration)
+
+			// 详细的错误分析
+			errorMsg := err.Error()
+			fmt.Printf("[高级回调] 🔍 错误分析:\n")
+			fmt.Printf("[高级回调]   - 错误信息: %v\n", err)
+
+			// 错误分类和建议
+			if strings.Contains(errorMsg, "timeout") || strings.Contains(errorMsg, "deadline") {
+				fmt.Printf("[高级回调]   - 错误类型: ⏰ 超时错误\n")
+				fmt.Printf("[高级回调]   - 建议: 增加超时时间或减少请求复杂度\n")
+			} else if strings.Contains(errorMsg, "token") || strings.Contains(errorMsg, "auth") {
+				fmt.Printf("[高级回调]   - 错误类型: 🔐 认证错误\n")
+				fmt.Printf("[高级回调]   - 建议: 检查 API Key 或认证配置\n")
+			} else if strings.Contains(errorMsg, "rate limit") || strings.Contains(errorMsg, "quota") {
+				fmt.Printf("[高级回调]   - 错误类型: 🚦 频率限制\n")
+				fmt.Printf("[高级回调]   - 建议: 降低请求频率或升级配额\n")
+			} else if strings.Contains(errorMsg, "network") || strings.Contains(errorMsg, "connection") {
+				fmt.Printf("[高级回调]   - 错误类型: 🌐 网络错误\n")
+				fmt.Printf("[高级回调]   - 建议: 检查网络连接或重试请求\n")
+			} else {
+				fmt.Printf("[高级回调]   - 错误类型: ❓ 未知错误\n")
+				fmt.Printf("[高级回调]   - 建议: 检查输入参数或联系技术支持\n")
+			}
+
+			// 错误统计和趋势
+			errorRate := float64(currentError) * 100 / float64(currentReq)
+			fmt.Printf("[高级回调] 📊 错误统计:\n")
+			fmt.Printf("[高级回调]   - 错误次数: %d\n", currentError)
+			fmt.Printf("[高级回调]   - 错误率: %.1f%%\n", errorRate)
+
+			// 健康度评估
+			if errorRate > 50 {
+				fmt.Printf("[高级回调]   - 系统状态: 🔴 需要关注\n")
+			} else if errorRate > 20 {
+				fmt.Printf("[高级回调]   - 系统状态: 🟡 轻微问题\n")
+			} else {
+				fmt.Printf("[高级回调]   - 系统状态: 🟢 运行良好\n")
+			}
+
+			return ctx
+		}).
+		Build()
+
+	// 运行高级回调示例
+	fmt.Println("\n--- 高级回调测试序列 ---")
+
+	testCases := []struct {
+		name    string
+		message string
+		options []model.Option
+	}{
+		{
+			name:    "简单问答",
+			message: "你好，请问今天天气怎么样？",
+			options: []model.Option{model.WithTemperature(0.7)},
+		},
+		{
+			name:    "复杂分析",
+			message: "请详细分析人工智能在医疗诊断领域的应用前景，包括技术挑战、伦理问题和未来发展趋势。",
+			options: []model.Option{model.WithTemperature(0.5), model.WithMaxTokens(800)},
+		},
+		{
+			name:    "错误测试",
+			message: strings.Repeat("这是一个超长的测试消息，用于触发可能的错误。", 100),
+			options: []model.Option{model.WithMaxTokens(1)}, // 故意设置很小的限制
+		},
+	}
+
+	// 创建测试链
+	chain := compose.NewChain[[]*schema.Message, *schema.Message]()
+	chain.AppendChatModel(cm)
+
+	runnable, err := chain.Compile(ctx)
+	if err != nil {
+		log.Printf("编译测试链失败: %v", err)
+		return
+	}
+
+	// 执行测试用例
+	for i, testCase := range testCases {
+		fmt.Printf("\n[高级回调] 🧪 测试用例 %d: %s\n", i+1, testCase.name)
+
+		messages := []*schema.Message{
+			{Role: schema.System, Content: "你是一个专业的AI助手，请提供准确和有用的回答。"},
+			{Role: schema.User, Content: testCase.message},
+		}
+
+		// 合并选项
+		allOptions := []compose.Option{compose.WithCallbacks(advancedHandler)}
+
+		_, err := runnable.Invoke(ctx, messages, allOptions...)
+		if err != nil {
+			// 错误已经在回调中处理了，这里只做简单记录
+			continue
+		}
+
+		// 在测试用例之间暂停一下
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	fmt.Printf("\n[高级回调] 🏁 === 测试序列完成 ===\n")
+	fmt.Printf("[高级回调] 📊 最终统计: 总测试=%d, 成功=%d, 失败=%d\n",
+		sessionStats.requestCount, sessionStats.successCount, sessionStats.errorCount)
+}
+
 // 主函数
 func main() {
 	ctx := context.Background()
@@ -865,9 +1166,11 @@ func main() {
 			try("工具调用示例", toolCallingExample)
 		case "callback":
 			try("回调监控示例", callbackExample)
+		case "advanced":
+			try("高级回调示例", advancedCallbackExample)
 		default:
 			fmt.Printf("未知示例: %s\n", exampleName)
-			fmt.Println("可用示例: basic, stream, orchestration, conversation, service, code, performance, tool, callback")
+			fmt.Println("可用示例: basic, stream, orchestration, conversation, service, code, performance, tool, callback, advanced")
 			return
 		}
 	} else {
@@ -881,6 +1184,7 @@ func main() {
 		//try("性能监控示例", performanceExample)
 		//try("工具调用示例", toolCallingExample)
 		try("回调监控示例", callbackExample)
+		//try("高级回调示例", advancedCallbackExample)
 	}
 
 	fmt.Println("\n🎉 所有示例运行完成！")
@@ -892,5 +1196,6 @@ func main() {
 	fmt.Println("  go run main.go performance  # 运行性能监控示例")
 	fmt.Println("  go run main.go tool         # 运行工具调用示例")
 	fmt.Println("  go run main.go callback     # 运行回调监控示例")
+	fmt.Println("  go run main.go advanced     # 运行高级回调示例")
 	fmt.Println("  ... 等等")
 }
