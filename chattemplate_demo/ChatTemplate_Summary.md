@@ -1,66 +1,71 @@
-# 🎨 Eino ChatTemplate 完全指南
+# 🎨 Eino ChatTemplate 组件完全指南
 
-> 💡 **核心价值**: ChatTemplate 是 Eino 框架中用于**智能化提示模板管理**的强大组件，让动态提示生成变得简单优雅。
+本文档是对 Eino 框架中 `ChatTemplate` 组件的核心功能和使用方式的完整总结，结合官方文档和实际项目示例。
 
----
+## 🚀 快速开始
 
-## 📋 目录
-- [核心概念](#-核心概念)
-- [功能特性](#-功能特性) 
-- [核心接口](#-核心接口)
-- [模板格式详解](#-模板格式详解)
-- [消息类型系统](#-消息类型系统)
-- [创建和使用模板](#-创建和使用模板)
-- [编排集成最佳实践](#-编排集成最佳实践)
-- [高级用法和技巧](#-高级用法和技巧)
-- [常见问题和解决方案](#-常见问题和解决方案)
+### 配置环境
+```bash
+# 如需要使用 Chain 编排示例，请设置 API Key
+export ARK_API_KEY="your-ark-api-key"
 
----
-
-## 🎯 核心概念
-
-**ChatTemplate** 是一个专门用于**处理和格式化提示（Prompt）**的智能组件。它的核心价值在于：
-
-🔄 **变量替换**: 将包含**变量占位符**的模板与用户提供的**具体值**相结合  
-📝 **标准化输出**: 生成符合 Eino 标准的消息列表 (`[]*schema.Message`)  
-🧩 **组件协作**: 与其他 Eino 组件无缝集成，构建完整的 AI 工作流  
-
-### 🌟 主要应用场景
-
+# 构建项目
+go build -o chattemplate_demo main.go
 ```
-📋 构建结构化提示
-├─ 🎭 角色定义模板 (系统提示)
-├─ 📚 任务描述模板 (用户指令) 
-└─ 🔄 动态内容插入
 
-💬 处理多轮对话  
-├─ 📜 对话历史管理
-├─ 🔗 上下文连接
-└─ 📍 消息占位符使用
+### 运行示例
+```bash
+# 运行所有示例
+./chattemplate_demo
 
-♻️ 实现提示模式复用
-├─ 📦 模板封装和抽象
-├─ 🔧 参数化配置
-└─ 🏭 工厂模式应用
+# 运行特定示例
+./chattemplate_demo basic        # 基础模板格式化
+./chattemplate_demo complex      # 复杂模板处理
+./chattemplate_demo conditional  # 条件模板逻辑
+./chattemplate_demo jinja2       # Jinja2 高级模板 ⭐ 新增
+./chattemplate_demo performance  # 性能基准测试
+./chattemplate_demo chain        # Chain 编排集成
+```
+
+### 配置文件
+项目使用 `config.yaml` 配置文件，也可以通过环境变量设置：
+```yaml
+ARK_API_KEY: "${ARK_API_KEY}"
+ARK_MODEL: "doubao-pro-4k"
+BASE_URL: "https://ark.cn-beijing.volces.com/api/v3"
 ```
 
 ---
 
-## ⚡ 功能特性
+## 📖 基本介绍
 
-| 特性 | 描述 | 优势 |
-|------|------|------|
-| 🎨 **多格式支持** | FString、GoTemplate、Jinja2 | 灵活适配不同复杂度需求 |
-| 🧠 **智能占位符** | MessagesPlaceholder 支持 | 轻松处理对话历史 |
-| 🔄 **类型安全** | 强类型接口设计 | 编译时错误检查 |
-| 🚀 **高性能** | 优化的模板引擎 | 快速模板渲染 |
-| 🧩 **组件化** | 与编排系统深度集成 | 声明式工作流构建 |
+`ChatTemplate` 组件是一个专门用于**处理和格式化提示（Prompt）**的智能组件。它的主要作用是将包含**变量占位符**的模板与用户提供的**具体值**相结合，生成符合 Eino 标准的消息列表。这个组件在 AI 应用开发中扮演着**"智能模板引擎"**的角色。
+
+### 🎯 核心价值
+
+在传统的模板处理中，我们只能进行简单的字符串替换。而 ChatTemplate 组件让我们能够：
+
+```
+传统模板：简单字符串替换 + 静态内容  ❌
+ChatTemplate：智能变量替换 + 动态消息构建 + 多格式支持  ✅
+```
+
+### 🚀 主要应用场景
+
+- **🎭 角色定义模板**: 构建结构化的系统提示和角色设定
+- **📚 任务描述模板**: 动态生成用户指令和任务说明
+- **💬 多轮对话管理**: 处理对话历史和上下文连接
+- **🔄 提示模式复用**: 模板封装和参数化配置
+- **🧩 组件协作**: 与其他 Eino 组件无缝集成构建完整工作流
+- **⚡ 动态内容插入**: 根据不同场景动态调整模板内容
 
 ---
 
-## 🔌 核心接口
+## 🔧 核心接口
 
-ChatTemplate 的设计非常简洁，只有一个核心接口：
+`ChatTemplate` 组件提供了简洁而强大的接口设计：
+
+### 基础接口
 
 ```go
 type ChatTemplate interface {
@@ -68,26 +73,64 @@ type ChatTemplate interface {
 }
 ```
 
-### 接口说明
+### 接口详解
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `ctx` | `context.Context` | 🔄 上下文控制（超时、取消等） |
-| `vs` | `map[string]any` | 📊 模板变量映射表 |
-| `opts` | `...Option` | ⚙️ 可选配置参数 |
-| **返回值** | `[]*schema.Message` | 📝 格式化后的消息列表 |
-| **错误** | `error` | ❌ 格式化过程中的错误 |
+#### 📝 Format 方法
+- **功能**: 将模板格式化为消息列表
+- **输入**:
+    - `ctx`: 上下文对象，用于控制超时、取消等
+    - `vs`: 模板变量映射表 (`map[string]any`)
+    - `opts`: 可选配置参数
+- **输出**:
+    - `[]*schema.Message`: 格式化后的消息列表
+    - `error`: 格式化过程中的错误信息
 
 ---
 
-## 📐 模板格式详解
+## 📨 Message 结构体
+
+`Message` 是模板生成的基本数据结构，支持丰富的消息类型：
+
+```go
+type Message struct {
+    // Role 表示消息的角色（system/user/assistant/tool）
+    Role RoleType
+    // Content 是消息的文本内容
+    Content string
+    // MultiContent 是多模态内容，支持文本、图片、音频等
+    MultiContent []ChatMessagePart
+    // Name 是消息的发送者名称
+    Name string
+    // ToolCalls 是 assistant 消息中的工具调用信息
+    ToolCalls []ToolCall
+    // ToolCallID 是 tool 消息的工具调用 ID
+    ToolCallID string
+    // ResponseMeta 包含响应的元信息
+    ResponseMeta *ResponseMeta
+    // Extra 用于存储额外信息
+    Extra map[string]any
+}
+```
+
+### 🎭 消息角色类型
+
+- **🔧 system**: 系统消息，用于设定AI的行为和角色
+- **👤 user**: 用户消息，来自用户的输入
+- **🤖 assistant**: AI助手消息，模型的回复
+- **🛠️ tool**: 工具消息，工具执行的结果
+
+---
+
+## 🎯 模板格式详解
+
+ChatTemplate 支持三种不同的模板格式，适应不同复杂度的需求：
 
 ### 1. 🎯 FString 格式 (推荐)
 
 **最常用的格式**，语法简单直观，适合大多数场景。
 
 ```go
-// ✅ 基础语法
+// 基础语法
 template := prompt.FromMessages(schema.FString,
     schema.SystemMessage("你是一个{role}。"),
     schema.UserMessage("请帮我{task}。")
@@ -132,6 +175,7 @@ variables := map[string]any{
 
 支持 Jinja2 模板语法，功能最强大。
 
+#### 🎯 基础示例
 ```go
 template := prompt.FromMessages(schema.Jinja2,
     schema.SystemMessage("你是{{ role }}{% if specialization %}，专长于{{ specialization }}{% endif %}。"),
@@ -139,35 +183,52 @@ template := prompt.FromMessages(schema.Jinja2,
 )
 ```
 
+#### 🚀 完整演示案例
+
+本项目的 `jinja2TemplateExample()` 函数展示了 Jinja2 的完整功能：
+
+```go
+template := prompt.FromMessages(schema.Jinja2,
+    schema.SystemMessage(`你是{{ role }}{% if expertise %}，专长于{{ expertise }}{% endif %}。
+
+你的服务特点:
+{% for feature in service_features %}
+- {{ feature }}
+{% endfor %}
+
+{% if strict_mode %}请严格按照专业标准回答。{% else %}请以友好的方式回答。{% endif %}`),
+    schema.MessagesPlaceholder("conversation_history", true),
+    schema.UserMessage(`当前任务类型: {{ task_type }}
+
+具体要求:
+{% for requirement in requirements %}
+{{ loop.index }}. {{ requirement }}
+{% endfor %}
+
+用户问题: {{ user_question }}`),
+)
+```
+
+**运行演示**:
+```bash
+go run main.go jinja2
+```
+
 **专业特性**:
 - 🎨 丰富的过滤器系统
 - 🧩 模板继承和包含
 - 🔧 自定义函数注册
 - 📚 完整的 Python Jinja2 兼容
+- ✅ 条件判断: `{% if %}...{% endif %}`
+- 🔄 循环处理: `{% for %}...{% endfor %}`
+- 📊 循环计数: `{{ loop.index }}`
+- 🎯 变量插值: `{{ variable_name }}`
 
 ---
 
-## 💬 消息类型系统
+## 📍 特殊占位符
 
-Eino 定义了标准的消息角色类型，确保与各种大模型的兼容性。
-
-### 核心角色类型
-
-```go
-// 🤖 系统角色 - 定义AI助手的行为和身份
-schema.SystemMessage("你是一个专业的编程助手。")
-
-// 👤 用户角色 - 用户的输入和请求  
-schema.UserMessage("请帮我写一个排序算法。")
-
-// 🤖 助手角色 - AI的回复和响应
-schema.AssistantMessage("我来为你介绍几种常用的排序算法...")
-
-// 🛠️ 工具角色 - 工具调用和结果
-schema.ToolMessage("计算结果: 42")
-```
-
-### 📍 特殊占位符
+### MessagesPlaceholder
 
 **MessagesPlaceholder** 是处理对话历史的关键组件：
 
@@ -375,22 +436,6 @@ func runWorkflow() {
     
     fmt.Println("📋 AI回复:", result.Content)
 }
-```
-
-### 🌐 Graph 编排模式（高级）
-
-对于复杂的并行处理需求，可以使用 Graph 编排：
-
-```go
-// Graph 编排适合复杂的条件分支和并行处理
-graph := compose.NewGraph[map[string]any, *schema.Message]()
-
-// 添加多个处理分支
-graph.AddChatTemplate("template_node", template)
-graph.AddChatModel("model_node", model)
-
-// 定义节点间的连接关系
-graph.AddEdge("template_node", "model_node")
 ```
 
 ---
@@ -611,14 +656,40 @@ ChatTemplate 是 Eino 框架中的**核心基础组件**，掌握它的使用对
 
 ### 💡 最佳实践总结
 1. **优先使用编排**: 将 ChatTemplate 与 Chain/Graph 结合使用
-2. **合理选择格式**: FString 适合简单场景，GoTemplate 适合复杂逻辑
+2. **合理选择格式**: FString 适合简单场景，GoTemplate 适合复杂逻辑，Jinja2 适合专业级应用
 3. **注重性能优化**: 使用模板缓存和变量预处理
 4. **完善错误处理**: 添加变量验证和异常捕获
 5. **遵循规范**: 严格按照 schema.Message 格式处理消息
+6. **学习完整示例**: 运行 `go run main.go jinja2` 体验 Jinja2 高级特性
 
 ### 🔗 相关资源
 - 📚 [官方文档](https://www.cloudwego.io/zh/docs/eino/core_modules/components/chat_template_guide/)
 - 💻 [示例代码](./main.go)
+- 🎯 [项目文档](./README.md)
 - 🌐 [GitHub 仓库](https://github.com/cloudwego/eino)
 
-通过掌握 ChatTemplate，你将能够构建出更加智能、灵活和可维护的 AI 应用！🚀
+### 🚀 快速体验
+```bash
+# 基础模板演示
+go run main.go basic
+
+# 复杂模板演示  
+go run main.go complex
+
+# 条件模板演示
+go run main.go conditional
+
+# Jinja2 高级模板演示 ⭐ 新增
+go run main.go jinja2
+
+# 性能测试演示
+go run main.go performance
+
+# Chain 编排演示（需要 API Key）
+go run main.go chain
+
+# 运行所有演示
+go run main.go
+```
+
+通过掌握 ChatTemplate 的各种格式（FString、GoTemplate、Jinja2），你将能够构建出更加智能、灵活和可维护的 AI 应用！🚀

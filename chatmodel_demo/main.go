@@ -123,14 +123,14 @@ func NewCustomerServiceBot(cm model.BaseChatModel) *CustomerServiceBot {
 func (bot *CustomerServiceBot) HandleCustomerQuery(ctx context.Context, query string) (string, error) {
 	// 构建系统提示
 	systemPrompt := fmt.Sprintf(`你是一个专业的客服助手。
-知识库信息：
-%s
-
-请根据知识库信息回答用户问题，如果知识库中没有相关信息，请礼貌地告知用户联系人工客服。
-回答要求：
-1. 语气友好、专业
-2. 回答简洁明了
-3. 如需要可以提供具体的联系方式`,
+		知识库信息：
+		%s
+		
+		请根据知识库信息回答用户问题，如果知识库中没有相关信息，请礼貌地告知用户联系人工客服。
+		回答要求：
+		1. 语气友好、专业
+		2. 回答简洁明了
+		3. 如需要可以提供具体的联系方式`,
 		strings.Join(bot.knowledge, "\n"))
 
 	messages := []*schema.Message{
@@ -1183,8 +1183,8 @@ func main() {
 		//try("代码生成示例", codeGenerationExample)
 		//try("性能监控示例", performanceExample)
 		//try("工具调用示例", toolCallingExample)
-		try("回调监控示例", callbackExample)
-		//try("高级回调示例", advancedCallbackExample)
+		//try("回调监控示例", callbackExample)
+		try("高级回调示例", advancedCallbackExample)
 	}
 
 	fmt.Println("\n🎉 所有示例运行完成！")
