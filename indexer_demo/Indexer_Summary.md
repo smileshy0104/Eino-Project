@@ -4,32 +4,7 @@
 
 ## 🚀 快速开始
 
-### 配置环境
-```bash
-# 设置 API Key 和 Milvus 配置
-export ARK_API_KEY="your-ark-api-key"
-export EMBEDDER_MODEL="doubao-embedding-text-240715"
-export MILVUS_ADDRESS="localhost:19530"
-export MILVUS_COLLECTION="eino_demo_collection"
-
-# 构建项目
-go build -o indexer_demo main.go
-```
-
-### 运行示例
-```bash
-# 运行所有示例
-./indexer_demo
-
-# 运行特定示例
-./indexer_demo basic        # 基础索引示例
-./indexer_demo batch        # 批量索引示例
-./indexer_demo complex      # 复杂文档索引示例
-./indexer_demo performance  # 索引性能测试示例
-./indexer_demo error        # 错误处理示例
-```
-
-### 配置文件
+### 🛠️ 配置文件
 项目使用 `config.yaml` 配置文件，也可以通过环境变量设置：
 ```yaml
 ARK_API_KEY: "${ARK_API_KEY}"
@@ -100,22 +75,21 @@ type Document struct {
     ID string
     // Content 是文档的主要文本内容
     Content string
-    // MetaData 包含文档的元数据信息
+    // MetaData 存储文档的元数据信息
     MetaData map[string]interface{}
-    // ParentID 是父文档的ID（用于分块文档）
-    ParentID string
-    // Score 是文档的相关性得分
-    Score float64
 }
 ```
 
 ### 🎭 文档字段说明
 
-- **🔑 ID**: 文档唯一标识符，用于检索和更新
+- **🔑 ID**: 文档的唯一标识符，用于在系统中唯一标识一个文档
 - **📄 Content**: 文档主要文本内容，用于向量化和搜索
-- **🏷️ MetaData**: 结构化元数据，支持复杂查询和过滤
-- **🔗 ParentID**: 父文档关联，支持分块文档管理
-- **📊 Score**: 相关性评分，用于结果排序和质量控制
+- **🏷️ MetaData**: 结构化元数据，支持复杂查询和过滤。文档的元数据，可以存储如下信息：
+  - 文档的来源信息
+  - 文档的向量表示（用于向量检索）
+  - 文档的分数（用于排序）
+  - 文档的子索引（用于分层检索）
+  - 其他自定义元数据
 
 ---
 
@@ -651,30 +625,9 @@ Indexer 是 Eino 框架中的**核心存储组件**，掌握它的使用对于�
 
 ### 🔗 相关资源
 - 📚 [官方文档](https://www.cloudwego.io/zh/docs/eino/core_modules/components/indexer_guide/)
-- 💻 [示例代码](./main.go)
-- 🎯 [项目文档](./README.md)
 - 🌐 [GitHub 仓库](https://github.com/cloudwego/eino)
 - 🗄️ [Milvus 官方文档](https://milvus.io/docs)
 
-### 🚀 快速体验
-```bash
-# 基础索引演示
-go run main.go basic
 
-# 批量索引演示  
-go run main.go batch
-
-# 复杂文档演示
-go run main.go complex
-
-# 性能测试演示
-go run main.go performance
-
-# 错误处理演示
-go run main.go error
-
-# 运行所有演示
-go run main.go
-```
 
 通过掌握 Indexer 组件的各种功能和最佳实践，你将能够构建出更加智能、高效和可扩展的文档存储和检索系统！🚀

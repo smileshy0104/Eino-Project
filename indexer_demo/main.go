@@ -10,6 +10,7 @@ import (
 
 	"github.com/cloudwego/eino-ext/components/embedding/ark"
 	"github.com/cloudwego/eino-ext/components/indexer/milvus"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	cli "github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
@@ -19,6 +20,7 @@ import (
 // 配置结构体
 type Config struct {
 	APIKey           string `mapstructure:"api_key"`
+	Model            string `mapstructure:"model"`
 	EmbedderModel    string `mapstructure:"embedder_model"`
 	MilvusAddress    string `mapstructure:"milvus_address"`
 	MilvusCollection string `mapstructure:"milvus_collection"`
@@ -61,6 +63,7 @@ func initConfig() (*Config, error) {
 
 	return &Config{
 		APIKey:           viper.GetString("ARK_API_KEY"),
+		Model:            viper.GetString("ARK_MODEL"),
 		EmbedderModel:    viper.GetString("EMBEDDER_MODEL"),
 		MilvusAddress:    viper.GetString("MILVUS_ADDRESS"),
 		MilvusCollection: viper.GetString("MILVUS_COLLECTION"),
@@ -127,14 +130,8 @@ func ensureCollection(ctx context.Context, client cli.Client, collectionName str
 }
 
 // 基础索引示例
-func basicIndexExample(ctx context.Context) {
+func basicIndexExample(ctx context.Context, config *Config) {
 	fmt.Println("\n=== 基础索引示例 ===")
-
-	config, err := initConfig()
-	if err != nil {
-		log.Printf("配置初始化失败: %v", err)
-		return
-	}
 
 	// 初始化 Embedder
 	embedder, err := initEmbedder(ctx, config)
@@ -208,14 +205,8 @@ func basicIndexExample(ctx context.Context) {
 }
 
 // 批量索引示例
-func batchIndexExample(ctx context.Context) {
+func batchIndexExample(ctx context.Context, config *Config) {
 	fmt.Println("\n=== 批量索引示例 ===")
-
-	config, err := initConfig()
-	if err != nil {
-		log.Printf("配置初始化失败: %v", err)
-		return
-	}
 
 	embedder, err := initEmbedder(ctx, config)
 	if err != nil {
@@ -294,14 +285,8 @@ func batchIndexExample(ctx context.Context) {
 }
 
 // 复杂文档索引示例
-func complexDocumentExample(ctx context.Context) {
+func complexDocumentExample(ctx context.Context, config *Config) {
 	fmt.Println("\n=== 复杂文档索引示例 ===")
-
-	config, err := initConfig()
-	if err != nil {
-		log.Printf("配置初始化失败: %v", err)
-		return
-	}
 
 	embedder, err := initEmbedder(ctx, config)
 	if err != nil {
@@ -475,14 +460,8 @@ func complexDocumentExample(ctx context.Context) {
 }
 
 // 索引性能测试示例
-func indexPerformanceExample(ctx context.Context) {
+func indexPerformanceExample(ctx context.Context, config *Config) {
 	fmt.Println("\n=== 索引性能测试示例 ===")
-
-	config, err := initConfig()
-	if err != nil {
-		log.Printf("配置初始化失败: %v", err)
-		return
-	}
 
 	embedder, err := initEmbedder(ctx, config)
 	if err != nil {
@@ -589,15 +568,123 @@ func indexPerformanceExample(ctx context.Context) {
 	fmt.Println("✅ 索引性能测试完成！")
 }
 
-// 错误处理示例
-func errorHandlingExample(ctx context.Context) {
-	fmt.Println("\n=== 错误处理示例 ===")
+// Chain编排模式示例
+func chainExample(ctx context.Context, config *Config) {
+	fmt.Println("\n=== Chain 编排模式示例 ===")
 
-	config, err := initConfig()
+	// 初始化 Embedder
+	embedder, err := initEmbedder(ctx, config)
 	if err != nil {
-		log.Printf("配置初始化失败: %v", err)
+		log.Printf("初始化Embedder失败: %v", err)
 		return
 	}
+
+	// 初始化 Milvus 客户端
+	client, err := initMilvusClient(ctx, config.MilvusAddress)
+	if err != nil {
+		log.Printf("初始化Milvus客户端失败: %v", err)
+		return
+	}
+	defer client.Close()
+
+	// 确保集合存在
+	if err := ensureCollection(ctx, client, config.MilvusCollection); err != nil {
+		log.Printf("确保集合存在失败: %v", err)
+		return
+	}
+
+	// 初始化 Indexer
+	cfg := &milvus.IndexerConfig{
+		Client:     client,
+		Collection: config.MilvusCollection,
+		Embedding:  embedder,
+		Fields:     fields,
+	}
+	indexer, err := milvus.NewIndexer(ctx, cfg)
+	if err != nil {
+		log.Printf("创建Indexer失败: %v", err)
+		return
+	}
+
+	fmt.Println("🔗 创建文档处理Chain...")
+
+	// 1️⃣ 创建 Chain - 声明输入输出类型
+	// 输入: []*schema.Document，输出: []string (文档ID列表)
+	chain := compose.NewChain[[]*schema.Document, []string]()
+
+	// 2️⃣ 添加Indexer组件到Chain中
+	chain.AppendIndexer(indexer)
+
+	// 3️⃣ 编译成可运行实例
+	fmt.Println("⚙️ 编译Chain工作流...")
+	runnable, err := chain.Compile(ctx)
+	if err != nil {
+		log.Printf("Chain编译失败: %v", err)
+		return
+	}
+
+	fmt.Println("✅ Chain编译成功！")
+
+	// 准备测试文档
+	documents := []*schema.Document{
+		{
+			ID:       "chain_001",
+			Content:  "Chain编排是Eino框架的核心特性，它允许将多个组件串联起来形成完整的处理工作流。",
+			MetaData: map[string]interface{}{"source": "chain_demo", "type": "concept"},
+		},
+		{
+			ID:       "chain_002",
+			Content:  "通过Chain，可以实现文档的自动化处理：文档输入 → 向量化 → 存储索引 → 返回结果。",
+			MetaData: map[string]interface{}{"source": "chain_demo", "type": "workflow"},
+		},
+		{
+			ID:       "chain_003",
+			Content:  "Chain编排模式特别适合线性处理流程，具有良好的可组合性和可扩展性。",
+			MetaData: map[string]interface{}{"source": "chain_demo", "type": "advantage"},
+		},
+	}
+
+	fmt.Printf("📝 准备通过Chain处理 %d 个文档\n", len(documents))
+	for i, doc := range documents {
+		fmt.Printf("  文档%d - ID: %s\n", i+1, doc.ID)
+	}
+
+	// 4️⃣ 通过Chain运行工作流
+	fmt.Println("🚀 执行Chain工作流...")
+	startTime := time.Now()
+
+	documentIDs, err := runnable.Invoke(ctx, documents)
+	if err != nil {
+		log.Printf("Chain执行失败: %v", err)
+		return
+	}
+
+	duration := time.Since(startTime)
+
+	fmt.Printf("✅ Chain执行成功，耗时: %v\n", duration)
+	fmt.Printf("📊 通过Chain存储了 %d 个文档: %v\n", len(documentIDs), documentIDs)
+
+	// 加载集合到内存
+	fmt.Println("🔄 加载集合到内存...")
+	err = client.LoadCollection(ctx, config.MilvusCollection, false)
+	if err != nil {
+		log.Printf("加载集合失败: %v", err)
+		return
+	}
+
+	fmt.Println("🎯 Chain编排的优势:")
+	fmt.Println("  • 声明式编程: 专注于组件关系而非实现细节")
+	fmt.Println("  • 类型安全: 编译时检查输入输出类型匹配")
+	fmt.Println("  • 易于测试: 可以独立测试每个组件")
+	fmt.Println("  • 可复用性: Chain可以作为更大工作流的一部分")
+	fmt.Println("  • 错误传播: 统一的错误处理机制")
+
+	fmt.Println("✅ Chain编排模式演示完成！")
+}
+
+// 错误处理示例
+func errorHandlingExample(ctx context.Context, config *Config) {
+	fmt.Println("\n=== 错误处理示例 ===")
 
 	// 演示配置验证
 	if config.APIKey == "" {
@@ -631,7 +718,7 @@ func errorHandlingExample(ctx context.Context) {
 
 	// 演示 Embedder 错误处理
 	fmt.Println("🔄 测试 Embedder 初始化...")
-	embedder, err := initEmbedder(ctx, config)
+	_, err = initEmbedder(ctx, config)
 	if err != nil {
 		fmt.Printf("❌ Embedder错误演示: %v\n", err)
 		fmt.Println("   常见原因:")
@@ -695,14 +782,14 @@ func main() {
 	fmt.Printf("  嵌入模型: %s\n", config.EmbedderModel)
 
 	// 3. 运行示例
-	try := func(name string, fn func(context.Context)) {
+	try := func(name string, fn func(context.Context, *Config)) {
 		fmt.Printf("\n正在运行: %s\n", name)
 		defer func() {
 			if r := recover(); r != nil {
 				fmt.Printf("示例 %s 运行出错: %v\n", name, r)
 			}
 		}()
-		fn(ctx)
+		fn(ctx, config)
 	}
 
 	// 检查命令行参数
@@ -717,19 +804,22 @@ func main() {
 			try("复杂文档索引示例", complexDocumentExample)
 		case "performance":
 			try("索引性能测试示例", indexPerformanceExample)
+		case "chain":
+			try("Chain编排模式示例", chainExample)
 		case "error":
 			try("错误处理示例", errorHandlingExample)
 		default:
 			fmt.Printf("未知示例: %s\n", exampleName)
-			fmt.Println("可用示例: basic, batch, complex, performance, error")
+			fmt.Println("可用示例: basic, batch, complex, performance, chain, error")
 			return
 		}
 	} else {
 		// 运行所有示例
-		try("基础索引示例", basicIndexExample)
-		try("批量索引示例", batchIndexExample)
-		try("复杂文档索引示例", complexDocumentExample)
-		try("索引性能测试示例", indexPerformanceExample)
+		//try("基础索引示例", basicIndexExample)
+		//try("批量索引示例", batchIndexExample)
+		//try("复杂文档索引示例", complexDocumentExample)
+		//try("索引性能测试示例", indexPerformanceExample)
+		//try("Chain编排模式示例", chainExample)
 		try("错误处理示例", errorHandlingExample)
 	}
 
@@ -740,5 +830,6 @@ func main() {
 	fmt.Println("  go run main.go batch        # 运行批量索引示例")
 	fmt.Println("  go run main.go complex      # 运行复杂文档示例")
 	fmt.Println("  go run main.go performance  # 运行性能测试示例")
+	fmt.Println("  go run main.go chain        # 运行Chain编排模式示例")
 	fmt.Println("  go run main.go error        # 运行错误处理示例")
 }
