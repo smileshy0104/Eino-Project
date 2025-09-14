@@ -3,18 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
-	"strings"
-	"time"
-
 	"github.com/cloudwego/eino-ext/components/embedding/ark"
 	"github.com/cloudwego/eino-ext/components/indexer/milvus"
+	//indexerCm "github.com/cloudwego/eino/components/indexer"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	cli "github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
 	"github.com/spf13/viper"
+	"log"
+	"os"
+	"strings"
+	"time"
 )
 
 // 配置结构体

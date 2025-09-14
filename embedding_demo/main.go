@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-
+	//"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino-ext/components/embedding/ark"
 	"github.com/cloudwego/eino/compose"
 	"github.com/spf13/viper"
@@ -541,6 +541,262 @@ func errorHandlingExample(ctx context.Context, config *Config) {
 	fmt.Println("✅ 错误处理演示完成！")
 }
 
+// Option配置示例
+func optionConfigExample(ctx context.Context, config *Config) {
+	fmt.Println("\n=== Option 配置示例 ===")
+
+	embedder, err := initEmbedder(ctx, config)
+	if err != nil {
+		log.Printf("初始化Embedder失败: %v", err)
+		return
+	}
+
+	// 准备测试文本
+	testTexts := []string{
+		"Option配置允许在运行时传入额外的配置参数，提供更大的灵活性。",
+		"通过Option，可以实现模型切换、批次大小调整等高级功能。",
+		"Embedding组件的Option支持多种参数配置，满足不同业务需求。",
+	}
+
+	fmt.Printf("📝 准备演示Option配置功能，处理 %d 个文本\n", len(testTexts))
+	for i, text := range testTexts {
+		fmt.Printf("  文本%d: %s\n", i+1, text)
+	}
+
+	// 演示1: 基础向量化（无Option）
+	fmt.Println("\n🔸 演示1: 基础向量化（无额外Option）")
+	startTime := time.Now()
+
+	basicVectors, err := embedder.EmbedStrings(ctx, testTexts[:1])
+	if err != nil {
+		log.Printf("基础向量化失败: %v", err)
+		return
+	}
+
+	duration := time.Since(startTime)
+	fmt.Printf("✅ 基础向量化成功，耗时: %v，生成向量数: %d\n",
+		duration, len(basicVectors))
+
+	// 演示2: 使用WithModel Option（概念展示）
+	fmt.Println("\n🔸 演示2: Option配置说明和概念演示")
+	fmt.Println("📋 常用Option配置:")
+	fmt.Println("  • embedding.WithModel(\"model-name\"): 临时切换模型")
+	fmt.Println("  • embedding.WithBatchSize(100): 设置批处理大小")
+	fmt.Println("  • embedding.WithTimeout(30*time.Second): 设置超时时间")
+	fmt.Println("  • embedding.WithRetry(3): 设置重试次数")
+
+	// 演示3: 批处理大小配置（模拟）
+	fmt.Println("\n🔸 演示3: 批处理优化配置")
+
+	// 准备更多测试文本用于批处理演示
+	batchTexts := make([]string, 15)
+	for i := 0; i < 15; i++ {
+		batchTexts[i] = fmt.Sprintf("批处理测试文本 %d - 这是用于演示批处理配置的示例文本。", i+1)
+	}
+
+	// 模拟不同批次大小的效果
+	batchSizes := []int{5, 10, 15}
+
+	for _, batchSize := range batchSizes {
+		fmt.Printf("\n  🔹 批次大小: %d\n", batchSize)
+		startTime := time.Now()
+
+		var allVectors [][]float64
+		for i := 0; i < len(batchTexts); i += batchSize {
+			end := i + batchSize
+			if end > len(batchTexts) {
+				end = len(batchTexts)
+			}
+
+			batch := batchTexts[i:end]
+
+			// 这里演示Option概念，实际使用时根据具体API调整
+			// vectors, err := embedder.EmbedStrings(ctx, batch, embedding.WithBatchSize(batchSize))
+			vectors, err := embedder.EmbedStrings(ctx, batch)
+			if err != nil {
+				log.Printf("批次处理失败: %v", err)
+				continue
+			}
+
+			allVectors = append(allVectors, vectors...)
+		}
+
+		batchDuration := time.Since(startTime)
+		fmt.Printf("    耗时: %v, 处理文本: %d, 生成向量: %d\n",
+			batchDuration, len(batchTexts), len(allVectors))
+	}
+
+	// 演示4: 不同场景下的Option使用模式
+	fmt.Println("\n🔸 演示4: 不同场景的Option配置模式")
+
+	fmt.Println("🎯 高精度场景配置:")
+	fmt.Println("   vectors, err := embedder.EmbedStrings(ctx, texts,")
+	fmt.Println("       embedding.WithModel(\"high-precision-model\"),")
+	fmt.Println("       embedding.WithTimeout(60*time.Second),")
+	fmt.Println("       embedding.WithRetry(5),")
+	fmt.Println("   )")
+
+	fmt.Println("\n📊 大批量处理场景:")
+	fmt.Println("   vectors, err := embedder.EmbedStrings(ctx, largeBatch,")
+	fmt.Println("       embedding.WithBatchSize(200),")
+	fmt.Println("       embedding.WithTimeout(120*time.Second),")
+	fmt.Println("       embedding.WithParallel(4),")
+	fmt.Println("   )")
+
+	fmt.Println("\n⚡ 快速处理场景:")
+	fmt.Println("   vectors, err := embedder.EmbedStrings(ctx, texts,")
+	fmt.Println("       embedding.WithModel(\"fast-model\"),")
+	fmt.Println("       embedding.WithBatchSize(50),")
+	fmt.Println("       embedding.WithTimeout(10*time.Second),")
+	fmt.Println("   )")
+
+	fmt.Println("\n💡 Option配置的优势:")
+	fmt.Println("  • 运行时灵活性: 无需重新创建组件即可调整行为")
+	fmt.Println("  • 场景适配: 针对不同业务场景使用不同配置")
+	fmt.Println("  • 性能优化: 根据数据特点和资源情况优化参数")
+	fmt.Println("  • 错误恢复: 配置重试和超时等容错机制")
+	fmt.Println("  • 成本控制: 通过模型选择和批次优化控制API调用成本")
+
+	fmt.Println("✅ Option配置演示完成！")
+}
+
+// Callback机制示例
+func callbackExample(ctx context.Context, config *Config) {
+	fmt.Println("\n=== Callback 机制示例 ===")
+
+	embedder, err := initEmbedder(ctx, config)
+	if err != nil {
+		log.Printf("初始化Embedder失败: %v", err)
+		return
+	}
+
+	// 准备测试文本
+	testTexts := []string{
+		"Callback机制是Eino框架的重要特性，允许在组件生命周期的关键节点注入自定义逻辑。",
+		"通过OnStart、OnEnd、OnError等回调，可以实现日志记录、性能监控、错误处理等功能。",
+		"Callback机制提供了非侵入式的组件扩展能力，是构建可观测系统的基础。",
+	}
+
+	fmt.Printf("📝 准备演示Callback机制功能，处理 %d 个文本\n", len(testTexts))
+	for i, text := range testTexts {
+		fmt.Printf("  文本%d: %s\n", i+1, text)
+	}
+
+	// 演示1: 手动触发回调事件（概念演示）
+	fmt.Println("\n🔸 演示1: Callback机制概念说明")
+
+	fmt.Println("🔄 模拟OnStart回调...")
+	fmt.Println("   🚀 开始向量化操作")
+	fmt.Printf("   📝 准备向量化 %d 个文本\n", len(testTexts))
+	for i, text := range testTexts {
+		fmt.Printf("      文本%d: 长度=%d字符\n", i+1, len(text))
+	}
+
+	// 记录开始时间
+	startTime := time.Now()
+
+	// 执行实际向量化
+	fmt.Println("⚡ 执行向量化...")
+	vectors, err := embedder.EmbedStrings(ctx, testTexts)
+
+	duration := time.Since(startTime)
+
+	if err != nil {
+		// 模拟OnError回调
+		fmt.Println("🔴 模拟OnError回调...")
+		fmt.Printf("   ❌ 向量化失败，耗时: %v\n", duration)
+		fmt.Printf("   💥 错误详情: %v\n", err)
+		fmt.Println("   🔧 建议检查:")
+		fmt.Println("      • 网络连接状态")
+		fmt.Println("      • API配置是否正确")
+		fmt.Println("      • 输入文本格式")
+		fmt.Println("      • 模型服务可用性")
+		return
+	}
+
+	// 模拟OnEnd回调
+	fmt.Println("🟢 模拟OnEnd回调...")
+	fmt.Printf("   ✅ 向量化完成，总耗时: %v\n", duration)
+	fmt.Printf("   📊 成功向量化 %d 个文本，生成向量维度: %d\n",
+		len(vectors), len(vectors[0]))
+
+	// 计算一些统计信息
+	avgProcessTime := duration / time.Duration(len(testTexts))
+	fmt.Printf("   📈 平均处理时间: %v/文本\n", avgProcessTime)
+
+	if duration.Seconds() > 0 {
+		throughput := float64(len(testTexts)) / duration.Seconds()
+		fmt.Printf("   🚀 处理吞吐量: %.2f 文本/秒\n", throughput)
+	}
+
+	// 演示2: Callback配置代码示例
+	fmt.Println("\n🔸 演示2: Callback配置代码示例")
+	fmt.Println("📋 标准Callback处理器创建代码:")
+	fmt.Println("   callbackHandler := callbacks.NewHandlerBuilder().")
+	fmt.Println("       OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {")
+	fmt.Println("           fmt.Printf(\"🚀 开始向量化操作\\n\")")
+	fmt.Println("           if texts, ok := input.([]string); ok {")
+	fmt.Println("               fmt.Printf(\"📝 处理 %d 个文本\\n\", len(texts))")
+	fmt.Println("           }")
+	fmt.Println("           return context.WithValue(ctx, \"start_time\", time.Now())")
+	fmt.Println("       }).")
+	fmt.Println("       OnEndFn(func(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) {")
+	fmt.Println("           startTime, _ := ctx.Value(\"start_time\").(time.Time)")
+	fmt.Println("           fmt.Printf(\"✅ 向量化完成，耗时: %v\\n\", time.Since(startTime))")
+	fmt.Println("           if vectors, ok := output.([][]float64); ok {")
+	fmt.Println("               fmt.Printf(\"📊 生成 %d 个向量\\n\", len(vectors))")
+	fmt.Println("           }")
+	fmt.Println("       }).")
+	fmt.Println("       OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) {")
+	fmt.Println("           fmt.Printf(\"❌ 向量化失败: %v\\n\", err)")
+	fmt.Println("       }).")
+	fmt.Println("       Build()")
+
+	fmt.Println("\n📋 在Chain中使用Callback:")
+	fmt.Println("   chain := compose.NewChain[[]string, [][]float64]()")
+	fmt.Println("   chain.AppendEmbedding(embedder, compose.WithCallbacks(callbackHandler))")
+	fmt.Println("   runnable, err := chain.Compile(ctx)")
+	fmt.Println("   vectors, err := runnable.Invoke(ctx, texts)")
+
+	// 演示3: 高级Callback应用场景
+	fmt.Println("\n🔸 演示3: 高级Callback应用场景")
+
+	fmt.Println("📊 性能监控Callback:")
+	fmt.Println("   - 记录每次向量化的响应时间")
+	fmt.Println("   - 统计API调用成功率和失败率")
+	fmt.Println("   - 监控向量维度变化")
+	fmt.Println("   - 计算处理吞吐量指标")
+
+	fmt.Println("\n🔍 调试分析Callback:")
+	fmt.Println("   - 记录输入文本的特征信息")
+	fmt.Println("   - 输出向量的统计特性")
+	fmt.Println("   - 中间处理步骤的详细日志")
+	fmt.Println("   - 异常情况的堆栈跟踪")
+
+	fmt.Println("\n💰 成本控制Callback:")
+	fmt.Println("   - 统计API调用次数和Token消耗")
+	fmt.Println("   - 监控不同模型的使用情况")
+	fmt.Println("   - 记录批处理效率优化效果")
+	fmt.Println("   - 成本预算和告警机制")
+
+	fmt.Println("🎯 Callback机制的优势:")
+	fmt.Println("  • 可观测性: 全面监控向量化过程的每个环节")
+	fmt.Println("  • 非侵入式: 不修改核心逻辑即可扩展功能")
+	fmt.Println("  • 灵活配置: 按需启用不同类型的回调处理")
+	fmt.Println("  • 统一接口: 所有组件使用相同的回调机制")
+	fmt.Println("  • 生命周期: 覆盖开始、结束、错误等关键节点")
+	fmt.Println("  • 数据洞察: 深入了解向量化性能和质量")
+
+	fmt.Println("\n📊 常见Callback应用场景:")
+	fmt.Println("  • 📈 性能分析: 识别瓶颈和优化机会")
+	fmt.Println("  • 📝 操作审计: 记录所有向量化操作历史")
+	fmt.Println("  • ⚠️ 异常告警: 及时发现和响应问题")
+	fmt.Println("  • 🔄 质量监控: 评估向量化结果质量")
+	fmt.Println("  • 🧪 A/B测试: 对比不同配置的效果")
+
+	fmt.Println("✅ Callback机制演示完成！")
+}
+
 // 主函数
 func main() {
 	ctx := context.Background()
@@ -555,7 +811,11 @@ func main() {
 	}
 
 	fmt.Printf("使用配置:\n")
-	fmt.Printf("  API Key: %s\n", config.APIKey[:10]+"...")
+	if len(config.APIKey) > 10 {
+		fmt.Printf("  API Key: %s\n", config.APIKey[:10]+"...")
+	} else {
+		fmt.Printf("  API Key: %s\n", config.APIKey)
+	}
 	fmt.Printf("  Embedder模型: %s\n", config.EmbedderModel)
 
 	// 3. 运行示例
@@ -585,9 +845,13 @@ func main() {
 			try("性能测试示例", performanceTestExample)
 		case "error":
 			try("错误处理示例", errorHandlingExample)
+		case "option":
+			try("Option配置示例", optionConfigExample)
+		case "callback":
+			try("Callback机制示例", callbackExample)
 		default:
 			fmt.Printf("未知示例: %s\n", exampleName)
-			fmt.Println("可用示例: basic, batch, search, chain, performance, error")
+			fmt.Println("可用示例: basic, batch, search, chain, performance, error, option, callback")
 			return
 		}
 	} else {
@@ -595,9 +859,11 @@ func main() {
 		//try("基础嵌入示例", basicEmbeddingExample)
 		//try("批量处理示例", batchProcessingExample)
 		//try("语义搜索示例", semanticSearchExample)
-		try("Chain编排示例", chainEmbeddingExample)
+		//try("Chain编排示例", chainEmbeddingExample)
 		//try("性能测试示例", performanceTestExample)
 		//try("错误处理示例", errorHandlingExample)
+		try("Option配置示例", optionConfigExample)
+		try("Callback机制示例", callbackExample)
 	}
 
 	fmt.Println("\n🎉 所有示例运行完成！")
@@ -609,4 +875,6 @@ func main() {
 	fmt.Println("  go run main.go chain        # 运行Chain编排示例")
 	fmt.Println("  go run main.go performance  # 运行性能测试示例")
 	fmt.Println("  go run main.go error        # 运行错误处理示例")
+	fmt.Println("  go run main.go option       # 运行Option配置示例")
+	fmt.Println("  go run main.go callback     # 运行Callback机制示例")
 }
