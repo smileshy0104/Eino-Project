@@ -628,6 +628,4 @@ Indexer 是 Eino 框架中的**核心存储组件**，掌握它的使用对于�
 - 🌐 [GitHub 仓库](https://github.com/cloudwego/eino)
 - 🗄️ [Milvus 官方文档](https://milvus.io/docs)
 
-
-
 通过掌握 Indexer 组件的各种功能和最佳实践，你将能够构建出更加智能、高效和可扩展的文档存储和检索系统！🚀

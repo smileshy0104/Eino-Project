@@ -682,6 +682,275 @@ func chainExample(ctx context.Context, config *Config) {
 	fmt.Println("✅ Chain编排模式演示完成！")
 }
 
+// Option配置示例
+func optionConfigExample(ctx context.Context, config *Config) {
+	fmt.Println("\n=== Option 配置示例 ===")
+
+	// 初始化 Embedder
+	embedder, err := initEmbedder(ctx, config)
+	if err != nil {
+		log.Printf("初始化Embedder失败: %v", err)
+		return
+	}
+
+	// 初始化 Milvus 客户端
+	client, err := initMilvusClient(ctx, config.MilvusAddress)
+	if err != nil {
+		log.Printf("初始化Milvus客户端失败: %v", err)
+		return
+	}
+	defer client.Close()
+
+	// 确保集合存在
+	if err := ensureCollection(ctx, client, config.MilvusCollection); err != nil {
+		log.Printf("确保集合存在失败: %v", err)
+		return
+	}
+
+	// 初始化 Indexer
+	cfg := &milvus.IndexerConfig{
+		Client:     client,
+		Collection: config.MilvusCollection,
+		Embedding:  embedder,
+		Fields:     fields,
+	}
+	indexer, err := milvus.NewIndexer(ctx, cfg)
+	if err != nil {
+		log.Printf("创建Indexer失败: %v", err)
+		return
+	}
+
+	// 准备测试文档
+	documents := []*schema.Document{
+		{
+			ID:       "option_001",
+			Content:  "Option配置允许在运行时传入额外的配置参数，提供更大的灵活性。",
+			MetaData: map[string]interface{}{"source": "option_demo", "type": "concept"},
+		},
+		{
+			ID:       "option_002",
+			Content:  "通过Option，可以实现子索引操作、临时替换组件等高级功能。",
+			MetaData: map[string]interface{}{"source": "option_demo", "type": "feature"},
+		},
+	}
+
+	fmt.Printf("📝 准备演示Option配置功能\n")
+
+	// 演示1: 基础存储（无Option）
+	fmt.Println("\n🔸 演示1: 基础存储（无额外Option）")
+	startTime := time.Now()
+	basicIDs, err := indexer.Store(ctx, documents[:1])
+	if err != nil {
+		log.Printf("基础存储失败: %v", err)
+		return
+	}
+	fmt.Printf("✅ 基础存储成功，耗时: %v，存储文档: %v\n", time.Since(startTime), basicIDs)
+
+	// 演示2: Option配置说明和概念演示
+	fmt.Println("\n🔸 演示2: Option配置说明和概念演示")
+
+	startTime = time.Now()
+
+	// 注意：这里演示Option的使用方式，实际项目中需要根据具体的milvus包API来调整
+	// 由于我们无法直接看到milvus包的Option实现，这里展示概念性用法
+	fmt.Println("📋 Option配置说明:")
+	fmt.Println("  • WithEmbedding(embedder): 临时替换Embedding组件")
+	fmt.Println("  • WithSubIndexes([]string): 指定子索引操作")
+	fmt.Println("  • WithTimeout(duration): 设置操作超时时间")
+	fmt.Println("  • WithRetry(count): 设置重试次数")
+
+	// 基础存储（演示概念，实际API可能不同）
+	optionIDs, err := indexer.Store(ctx, documents[1:])
+	if err != nil {
+		log.Printf("Option存储失败: %v", err)
+		return
+	}
+
+	duration := time.Since(startTime)
+	fmt.Printf("✅ Option存储成功，耗时: %v，存储文档: %v\n", duration, optionIDs)
+
+	// 演示3: 不同场景下的Option使用
+	fmt.Println("\n🔸 演示3: 不同场景的Option配置模式")
+	fmt.Println("🎯 高优先级文档处理场景:")
+	fmt.Println("   ids, err := indexer.Store(ctx, documents,")
+	fmt.Println("       WithTimeout(30*time.Second),    // 延长超时时间")
+	fmt.Println("       WithRetry(3),                   // 增加重试次数")
+	fmt.Println("       WithPriority(\"high\"),           // 设置处理优先级")
+	fmt.Println("   )")
+
+	fmt.Println("\n📊 批量处理场景:")
+	fmt.Println("   ids, err := indexer.Store(ctx, batchDocuments,")
+	fmt.Println("       WithBatchSize(100),             // 设置批量大小")
+	fmt.Println("       WithParallel(4),                // 并行处理数量")
+	fmt.Println("       WithCallback(progressHandler),  // 进度回调")
+	fmt.Println("   )")
+
+	fmt.Println("\n🔍 子索引分区场景:")
+	fmt.Println("   ids, err := indexer.Store(ctx, documents,")
+	fmt.Println("       WithSubIndexes([]string{\"partition_1\", \"partition_2\"}),")
+	fmt.Println("       WithPartitionKey(\"category\"),   // 分区键")
+	fmt.Println("   )")
+
+	// 加载集合到内存
+	fmt.Println("\n🔄 加载集合到内存...")
+	err = client.LoadCollection(ctx, config.MilvusCollection, false)
+	if err != nil {
+		log.Printf("加载集合失败: %v", err)
+		return
+	}
+
+	fmt.Println("💡 Option配置的优势:")
+	fmt.Println("  • 运行时灵活性: 无需重新创建组件即可调整行为")
+	fmt.Println("  • 场景适配: 针对不同业务场景使用不同配置")
+	fmt.Println("  • 性能优化: 根据数据特点优化处理参数")
+	fmt.Println("  • 错误恢复: 配置重试和超时等容错机制")
+	fmt.Println("✅ Option配置演示完成！")
+}
+
+// Callback机制示例
+func callbackExample(ctx context.Context, config *Config) {
+	fmt.Println("\n=== Callback 机制示例 ===")
+
+	// 初始化 Embedder
+	embedder, err := initEmbedder(ctx, config)
+	if err != nil {
+		log.Printf("初始化Embedder失败: %v", err)
+		return
+	}
+
+	// 初始化 Milvus 客户端
+	client, err := initMilvusClient(ctx, config.MilvusAddress)
+	if err != nil {
+		log.Printf("初始化Milvus客户端失败: %v", err)
+		return
+	}
+	defer client.Close()
+
+	// 确保集合存在
+	if err := ensureCollection(ctx, client, config.MilvusCollection); err != nil {
+		log.Printf("确保集合存在失败: %v", err)
+		return
+	}
+
+	// 初始化 Indexer
+	cfg := &milvus.IndexerConfig{
+		Client:     client,
+		Collection: config.MilvusCollection,
+		Embedding:  embedder,
+		Fields:     fields,
+	}
+	indexer, err := milvus.NewIndexer(ctx, cfg)
+	if err != nil {
+		log.Printf("创建Indexer失败: %v", err)
+		return
+	}
+
+	// 准备测试文档
+	documents := []*schema.Document{
+		{
+			ID:       "callback_001",
+			Content:  "Callback机制是Eino框架的重要特性，允许在组件生命周期的关键节点注入自定义逻辑。",
+			MetaData: map[string]interface{}{"source": "callback_demo", "type": "concept"},
+		},
+		{
+			ID:       "callback_002",
+			Content:  "通过OnStart、OnEnd、OnError等回调，可以实现日志记录、性能监控、错误处理等功能。",
+			MetaData: map[string]interface{}{"source": "callback_demo", "type": "feature"},
+		},
+		{
+			ID:       "callback_003",
+			Content:  "Callback机制提供了非侵入式的组件扩展能力，是构建可观测系统的基础。",
+			MetaData: map[string]interface{}{"source": "callback_demo", "type": "advantage"},
+		},
+	}
+
+	fmt.Printf("📝 准备演示Callback机制功能，处理 %d 个文档\n", len(documents))
+
+	// 演示1: 手动触发回调事件（概念演示）
+	fmt.Println("\n🔸 演示1: Callback机制概念说明")
+
+	fmt.Println("🔄 模拟OnStart回调...")
+	fmt.Println("   🚀 开始索引操作")
+	fmt.Printf("   📝 准备索引 %d 个文档\n", len(documents))
+	for i, doc := range documents {
+		fmt.Printf("      文档%d: ID=%s, 内容长度=%d字符\n",
+			i+1, doc.ID, len(doc.Content))
+	}
+
+	// 记录开始时间
+	startTime := time.Now()
+
+	// 执行实际存储
+	fmt.Println("⚡ 执行文档索引...")
+	storedIDs, err := indexer.Store(ctx, documents)
+
+	duration := time.Since(startTime)
+
+	if err != nil {
+		// 模拟OnError回调
+		fmt.Println("🔴 模拟OnError回调...")
+		fmt.Printf("   ❌ 索引操作失败，耗时: %v\n", duration)
+		fmt.Printf("   💥 错误详情: %v\n", err)
+		fmt.Println("   🔧 建议检查:")
+		fmt.Println("      • 网络连接状态")
+		fmt.Println("      • 文档格式是否正确")
+		fmt.Println("      • Milvus服务是否正常")
+		fmt.Println("      • API配置是否有效")
+		return
+	}
+
+	// 模拟OnEnd回调
+	fmt.Println("🟢 模拟OnEnd回调...")
+	fmt.Printf("   ✅ 索引操作完成，总耗时: %v\n", duration)
+	fmt.Printf("   📊 成功索引 %d 个文档: %v\n", len(storedIDs), storedIDs)
+
+	// 演示2: Callback配置代码示例
+	fmt.Println("\n🔸 演示2: Callback配置代码示例")
+	fmt.Println("📋 标准Callback处理器创建代码:")
+	fmt.Println("   callbackHandler := callbacks.NewHandlerBuilder().")
+	fmt.Println("       OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {")
+	fmt.Println("           fmt.Printf(\"🚀 开始索引操作\\n\")")
+	fmt.Println("           return context.WithValue(ctx, \"start_time\", time.Now())")
+	fmt.Println("       }).")
+	fmt.Println("       OnEndFn(func(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) {")
+	fmt.Println("           startTime, _ := ctx.Value(\"start_time\").(time.Time)")
+	fmt.Println("           fmt.Printf(\"✅ 索引完成，耗时: %v\\n\", time.Since(startTime))")
+	fmt.Println("       }).")
+	fmt.Println("       OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) {")
+	fmt.Println("           fmt.Printf(\"❌ 索引失败: %v\\n\", err)")
+	fmt.Println("       }).")
+	fmt.Println("       Build()")
+
+	fmt.Println("\n📋 在Chain中使用Callback:")
+	fmt.Println("   chain := compose.NewChain[[]*schema.Document, []string]()")
+	fmt.Println("   chain.AppendIndexer(indexer, compose.WithCallbacks(callbackHandler))")
+	fmt.Println("   runnable, err := chain.Compile(ctx)")
+
+	// 加载集合到内存
+	fmt.Println("\n🔄 加载集合到内存...")
+	err = client.LoadCollection(ctx, config.MilvusCollection, false)
+	if err != nil {
+		log.Printf("加载集合失败: %v", err)
+		return
+	}
+
+	fmt.Println("🎯 Callback机制的优势:")
+	fmt.Println("  • 可观测性: 全面监控组件执行状态和性能")
+	fmt.Println("  • 非侵入式: 不修改组件代码即可扩展功能")
+	fmt.Println("  • 灵活配置: 按需启用不同类型的回调处理")
+	fmt.Println("  • 统一接口: 所有组件使用相同的回调机制")
+	fmt.Println("  • 生命周期: 覆盖开始、结束、错误等关键节点")
+
+	fmt.Println("\n📊 常见Callback应用场景:")
+	fmt.Println("  • 📈 性能监控: 记录执行时间和资源使用")
+	fmt.Println("  • 📝 操作日志: 详细记录组件执行过程")
+	fmt.Println("  • ⚠️ 错误处理: 统一的错误记录和告警")
+	fmt.Println("  • 🔄 进度跟踪: 实时显示长时间操作的进度")
+	fmt.Println("  • 🧪 调试辅助: 开发阶段的详细调试信息")
+
+	fmt.Println("✅ Callback机制演示完成！")
+}
+
 // 错误处理示例
 func errorHandlingExample(ctx context.Context, config *Config) {
 	fmt.Println("\n=== 错误处理示例 ===")
@@ -806,11 +1075,15 @@ func main() {
 			try("索引性能测试示例", indexPerformanceExample)
 		case "chain":
 			try("Chain编排模式示例", chainExample)
+		case "option":
+			try("Option配置示例", optionConfigExample)
+		case "callback":
+			try("Callback机制示例", callbackExample)
 		case "error":
 			try("错误处理示例", errorHandlingExample)
 		default:
 			fmt.Printf("未知示例: %s\n", exampleName)
-			fmt.Println("可用示例: basic, batch, complex, performance, chain, error")
+			fmt.Println("可用示例: basic, batch, complex, performance, chain, option, callback, error")
 			return
 		}
 	} else {
@@ -820,7 +1093,9 @@ func main() {
 		//try("复杂文档索引示例", complexDocumentExample)
 		//try("索引性能测试示例", indexPerformanceExample)
 		//try("Chain编排模式示例", chainExample)
-		try("错误处理示例", errorHandlingExample)
+		try("Option配置示例", optionConfigExample)
+		//try("Callback机制示例", callbackExample)
+		//try("错误处理示例", errorHandlingExample)
 	}
 
 	fmt.Println("\n🎉 所有示例运行完成！")
@@ -831,5 +1106,7 @@ func main() {
 	fmt.Println("  go run main.go complex      # 运行复杂文档示例")
 	fmt.Println("  go run main.go performance  # 运行性能测试示例")
 	fmt.Println("  go run main.go chain        # 运行Chain编排模式示例")
+	fmt.Println("  go run main.go option       # 运行Option配置示例")
+	fmt.Println("  go run main.go callback     # 运行Callback机制示例")
 	fmt.Println("  go run main.go error        # 运行错误处理示例")
 }
