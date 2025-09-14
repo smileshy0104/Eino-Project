@@ -1092,8 +1092,8 @@ func main() {
 		//try("批量索引示例", batchIndexExample)
 		//try("复杂文档索引示例", complexDocumentExample)
 		//try("索引性能测试示例", indexPerformanceExample)
-		//try("Chain编排模式示例", chainExample)
-		try("Option配置示例", optionConfigExample)
+		try("Chain编排模式示例", chainExample)
+		//try("Option配置示例", optionConfigExample)
 		//try("Callback机制示例", callbackExample)
 		//try("错误处理示例", errorHandlingExample)
 	}
