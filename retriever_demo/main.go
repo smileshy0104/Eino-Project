@@ -3,19 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/eino-ext/components/embedding/ark"
+	arkmodel "github.com/cloudwego/eino-ext/components/model/ark"
+	"github.com/cloudwego/eino-ext/components/retriever/milvus"
+	//retrieverCm "github.com/cloudwego/eino/components/retriever"
+	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/schema"
+	cli "github.com/milvus-io/milvus-sdk-go/v2/client"
+	"github.com/spf13/viper"
 	"log"
 	"math"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/cloudwego/eino-ext/components/embedding/ark"
-	arkmodel "github.com/cloudwego/eino-ext/components/model/ark"
-	"github.com/cloudwego/eino-ext/components/retriever/milvus"
-	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
-	cli "github.com/milvus-io/milvus-sdk-go/v2/client"
-	"github.com/spf13/viper"
 )
 
 // 配置结构体
