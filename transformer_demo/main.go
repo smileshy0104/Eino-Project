@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	"github.com/spf13/viper"
 	"log"
 	"math"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -773,7 +775,402 @@ func transformStrategyExample(ctx context.Context) {
 	fmt.Println("✅ 转换策略对比示例完成！")
 }
 
-// 8. 策略对比示例
+// 8. Chain编排示例
+func chainOrchestrationExample(ctx context.Context) {
+	fmt.Println("\n=== Chain编排示例 ===")
+
+	// 准备测试文档
+	document := &schema.Document{
+		ID: "chain-test-001",
+		Content: `# Chain编排演示文档
+
+Chain（链式编排）是 Eino 中最常见的编排方式，将多个组件按顺序连接。
+
+## 文档预处理
+
+在进入主流程之前，文档需要经过预处理步骤。
+
+### 格式标准化
+
+统一文档格式，确保后续处理的一致性。
+
+### 内容清理
+
+移除无关信息，保留核心内容。
+
+## 核心处理流程
+
+主要的处理逻辑在这里执行。
+
+### 语义分析
+
+对文档进行语义分析，提取关键信息。
+
+## 后处理阶段
+
+处理完成后的收尾工作。
+
+### 结果验证
+
+验证处理结果的正确性。
+
+### 输出格式化
+
+将结果格式化为标准输出格式。`,
+		MetaData: map[string]interface{}{
+			"source":     "chain_demo",
+			"type":       "tutorial",
+			"complexity": "medium",
+			"created_at": time.Now().Format(time.RFC3339),
+		},
+	}
+
+	fmt.Printf("📝 准备Chain编排演示: %s\n", document.ID)
+	fmt.Printf("📊 文档信息: %d 字符，复杂度: %v\n", len(document.Content), document.MetaData["complexity"])
+
+	// 创建多个Transformer用于Chain编排
+	splitter1, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderConfig{
+		Headers: map[string]string{
+			"##": "Header 2", // 第一步：按二级标题分割
+		},
+	})
+	if err != nil {
+		fmt.Printf("❌ 创建第一个Splitter失败: %v\n", err)
+		return
+	}
+
+	splitter2, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderConfig{
+		Headers: map[string]string{
+			"###": "Header 3", // 第二步：进一步按三级标题分割
+		},
+	})
+	if err != nil {
+		fmt.Printf("❌ 创建第二个Splitter失败: %v\n", err)
+		return
+	}
+
+	fmt.Println("\n🔗 构建Chain编排...")
+
+	// 使用Lambda函数创建链式处理
+	chain := compose.NewChain[[]*schema.Document, []*schema.Document]()
+
+	// 步骤1: 第一轮分割（按二级标题）
+	chain.AppendLambda(compose.InvokableLambda(func(ctx context.Context, docs []*schema.Document) ([]*schema.Document, error) {
+		fmt.Println("🔄 [Chain步骤1] 执行二级标题分割...")
+		startTime := time.Now()
+		result, err := splitter1.Transform(ctx, docs)
+		duration := time.Since(startTime)
+		if err != nil {
+			return nil, fmt.Errorf("第一步分割失败: %v", err)
+		}
+		fmt.Printf("✅ [Chain步骤1] 完成：%d个文档 → %d个块 (耗时:%v)\n", len(docs), len(result), duration)
+		return result, nil
+	}))
+
+	// 步骤2: 第二轮分割（按三级标题）
+	chain.AppendLambda(compose.InvokableLambda(func(ctx context.Context, docs []*schema.Document) ([]*schema.Document, error) {
+		fmt.Println("🔄 [Chain步骤2] 执行三级标题分割...")
+		startTime := time.Now()
+		result, err := splitter2.Transform(ctx, docs)
+		duration := time.Since(startTime)
+		if err != nil {
+			return nil, fmt.Errorf("第二步分割失败: %v", err)
+		}
+		fmt.Printf("✅ [Chain步骤2] 完成：%d个块 → %d个块 (耗时:%v)\n", len(docs), len(result), duration)
+		return result, nil
+	}))
+
+	// 编译Chain
+	fmt.Println("\n⚙️ 编译Chain工作流...")
+	runnable, err := chain.Compile(ctx)
+	if err != nil {
+		fmt.Printf("❌ 编译Chain失败: %v\n", err)
+		return
+	}
+	fmt.Println("✅ Chain编译成功！")
+
+	// 执行Chain编排
+	fmt.Println("\n🚀 执行Chain编排处理...")
+	startTime := time.Now()
+
+	result, err := runnable.Invoke(ctx, []*schema.Document{document})
+	if err != nil {
+		fmt.Printf("❌ Chain编排执行失败: %v\n", err)
+		return
+	}
+
+	duration := time.Since(startTime)
+
+	// 显示编排结果
+	fmt.Printf("\n🎯 Chain编排完成！\n")
+	fmt.Printf("📊 处理统计:\n")
+	fmt.Printf("  • 输入: 1 个文档\n")
+	fmt.Printf("  • 输出: %d 个块\n", len(result))
+	fmt.Printf("  • 处理时间: %v\n", duration)
+	fmt.Printf("  • 链式步骤: %d 个\n", 2)
+
+	// 显示部分结果
+	fmt.Println("\n🔍 编排结果预览:")
+	for i, chunk := range result {
+		if i >= 3 {
+			fmt.Printf("  ... 其余 %d 个块\n", len(result)-3)
+			break
+		}
+		fmt.Printf("  块 %d: %s (%d 字符)\n", i+1, getFirstLine(chunk.Content), len(chunk.Content))
+	}
+
+	fmt.Println("\n💡 Chain编排优势:")
+	fmt.Println("  • 线性处理流程，逻辑清晰")
+	fmt.Println("  • 组件间数据自动传递")
+	fmt.Println("  • 支持编译时优化")
+	fmt.Println("  • 适合顺序处理场景")
+
+	fmt.Println("✅ Chain编排示例完成！")
+}
+
+// 9. Graph编排示例
+func graphOrchestrationExample(ctx context.Context) {
+	fmt.Println("\n=== Graph编排示例 ===")
+
+	// 准备测试文档
+	document := &schema.Document{
+		ID: "graph-test-001",
+		Content: `# Graph编排演示文档
+
+Graph（图编排）支持复杂的并行和条件处理流程。
+
+## 并行处理分支 A
+
+这部分内容将被分支 A 处理。
+
+### A.1 数据处理
+
+分支 A 的数据处理逻辑。
+
+### A.2 结果分析
+
+分支 A 的结果分析过程。
+
+## 并行处理分支 B
+
+这部分内容将被分支 B 处理。
+
+### B.1 算法执行
+
+分支 B 的算法执行过程。
+
+### B.2 性能优化
+
+分支 B 的性能优化策略。
+
+## 汇聚处理节点
+
+所有分支的结果在此汇聚处理。
+
+### 结果合并
+
+将各分支结果合并的逻辑。
+
+### 质量检查
+
+对合并结果进行质量检查。`,
+		MetaData: map[string]interface{}{
+			"source":     "graph_demo",
+			"type":       "advanced_tutorial",
+			"complexity": "high",
+			"branches":   2,
+			"created_at": time.Now().Format(time.RFC3339),
+		},
+	}
+
+	fmt.Printf("📝 准备Graph编排演示: %s\n", document.ID)
+	fmt.Printf("📊 文档信息: %d 字符，分支数: %v，复杂度: %v\n",
+		len(document.Content), document.MetaData["branches"], document.MetaData["complexity"])
+
+	// 创建不同配置的Transformer用于并行处理
+	splitterA, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderConfig{
+		Headers: map[string]string{
+			"##": "Header 2", // 分支A：粗粒度分割
+		},
+	})
+	if err != nil {
+		fmt.Printf("❌ 创建分支A Splitter失败: %v\n", err)
+		return
+	}
+
+	splitterB, err := markdown.NewHeaderSplitter(ctx, &markdown.HeaderConfig{
+		Headers: map[string]string{
+			"###": "Header 3", // 分支B：细粒度分割
+		},
+	})
+	if err != nil {
+		fmt.Printf("❌ 创建分支B Splitter失败: %v\n", err)
+		return
+	}
+
+	fmt.Println("\n📊 模拟Graph编排(并行处理)...")
+	fmt.Println("📈 处理流程: 输入 → [分支A ∥ 分支B] → 结果合并 → 输出")
+
+	// 模拟Graph的并行处理模式
+	startTime := time.Now()
+
+	// 使用 goroutine 和channel 模拟并行处理
+	type BranchResult struct {
+		Name     string
+		Chunks   []*schema.Document
+		Error    error
+		Duration time.Duration
+	}
+
+	resultChan := make(chan BranchResult, 2)
+	var wg sync.WaitGroup
+
+	// 分支A: 并行处理
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		fmt.Println("🔄 [Graph分支A] 开始并行处理...")
+		branchStart := time.Now()
+
+		chunks, err := splitterA.Transform(ctx, []*schema.Document{document})
+		duration := time.Since(branchStart)
+
+		if err != nil {
+			fmt.Printf("❌ [Graph分支A] 处理失败: %v\n", err)
+			resultChan <- BranchResult{Name: "分支A", Error: err, Duration: duration}
+			return
+		}
+
+		// 添加分支标识
+		for _, chunk := range chunks {
+			if chunk.MetaData == nil {
+				chunk.MetaData = make(map[string]interface{})
+			}
+			chunk.MetaData["processing_branch"] = "A"
+			chunk.MetaData["split_strategy"] = "Header2"
+		}
+
+		fmt.Printf("✅ [Graph分支A] 完成: %d个块 (耗时:%v)\n", len(chunks), duration)
+		resultChan <- BranchResult{Name: "分支A", Chunks: chunks, Duration: duration}
+	}()
+
+	// 分支B: 并行处理
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		fmt.Println("🔄 [Graph分支B] 开始并行处理...")
+		branchStart := time.Now()
+
+		chunks, err := splitterB.Transform(ctx, []*schema.Document{document})
+		duration := time.Since(branchStart)
+
+		if err != nil {
+			fmt.Printf("❌ [Graph分支B] 处理失败: %v\n", err)
+			resultChan <- BranchResult{Name: "分支B", Error: err, Duration: duration}
+			return
+		}
+
+		// 添加分支标识
+		for _, chunk := range chunks {
+			if chunk.MetaData == nil {
+				chunk.MetaData = make(map[string]interface{})
+			}
+			chunk.MetaData["processing_branch"] = "B"
+			chunk.MetaData["split_strategy"] = "Header3"
+		}
+
+		fmt.Printf("✅ [Graph分支B] 完成: %d个块 (耗时:%v)\n", len(chunks), duration)
+		resultChan <- BranchResult{Name: "分支B", Chunks: chunks, Duration: duration}
+	}()
+
+	// 等待所有分支完成
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// 收集并合并结果
+	fmt.Println("\n🔄 [Graph合并] 收集并行处理结果...")
+	var allResults []*schema.Document
+	var totalBranches int
+	var successBranches int
+	var totalProcessingTime time.Duration
+
+	for result := range resultChan {
+		totalBranches++
+		totalProcessingTime += result.Duration
+
+		if result.Error != nil {
+			fmt.Printf("❌ [Graph合并] 分支%s失败: %v\n", result.Name, result.Error)
+			continue
+		}
+
+		successBranches++
+		allResults = append(allResults, result.Chunks...)
+		fmt.Printf("✅ [Graph合并] 收集分支%s: %d个块\n", result.Name, len(result.Chunks))
+	}
+
+	totalDuration := time.Since(startTime)
+
+	// 显示编排结果
+	fmt.Printf("\n🎯 Graph编排完成！\n")
+	fmt.Printf("📊 处理统计:\n")
+	fmt.Printf("  • 输入: 1 个文档\n")
+	fmt.Printf("  • 输出: %d 个块\n", len(allResults))
+	fmt.Printf("  • 总耗时: %v\n", totalDuration)
+	fmt.Printf("  • 并行分支: %d/%d 成功\n", successBranches, totalBranches)
+	fmt.Printf("  • 并行效率: %.1fx 加速\n", float64(totalProcessingTime)/float64(totalDuration))
+
+	// 显示部分结果
+	fmt.Println("\n🔍 Graph编排结果预览:")
+	branchACount := 0
+	branchBCount := 0
+	for i, chunk := range allResults {
+		if i >= 4 {
+			fmt.Printf("  ... 其余 %d 个块\n", len(allResults)-4)
+			break
+		}
+
+		branch := "未知"
+		strategy := "未知"
+		if chunk.MetaData != nil {
+			if b, ok := chunk.MetaData["processing_branch"].(string); ok {
+				branch = b
+				if b == "A" {
+					branchACount++
+				} else if b == "B" {
+					branchBCount++
+				}
+			}
+			if s, ok := chunk.MetaData["split_strategy"].(string); ok {
+				strategy = s
+			}
+		}
+
+		fmt.Printf("  块 %d: %s (%d 字符) [分支%s-%s]\n",
+			i+1, getFirstLine(chunk.Content), len(chunk.Content), branch, strategy)
+	}
+
+	fmt.Printf("\n📋 分支结果统计:\n")
+	fmt.Printf("  • 分支A (二级标题): %d 个块\n", branchACount)
+	fmt.Printf("  • 分支B (三级标题): %d 个块\n", branchBCount)
+
+	fmt.Println("\n💡 Graph编排优势:")
+	fmt.Println("  • 支持并行处理，显著提高效率")
+	fmt.Println("  • 灵活的分支和合并逻辑")
+	fmt.Println("  • 适合复杂工作流和多路径处理")
+	fmt.Println("  • 可以独立处理各分支错误")
+
+	fmt.Println("\n🔍 处理路径分析:")
+	fmt.Println("  1. 并行启动: 同时启动分支A和分支B")
+	fmt.Println("  2. 分支A: 文档 → 二级标题分割 → 标记分支")
+	fmt.Println("  3. 分支B: 文档 → 三级标题分割 → 标记分支")
+	fmt.Println("  4. 合并: 等待所有分支 → 收集结果 → 统一输出")
+
+	fmt.Println("✅ Graph编排示例完成！")
+}
+
+// 10. 策略对比示例
 func comparisonExample(ctx context.Context) {
 	fmt.Println("\n=== 策略对比示例 ===")
 
@@ -816,7 +1213,6 @@ func comparisonExample(ctx context.Context) {
 			log.Printf("初始化失败: %v", err)
 			continue
 		}
-
 		chunks, err := splitter.Transform(ctx, []*schema.Document{document})
 		if err != nil {
 			log.Printf("转换失败: %v", err)
@@ -889,11 +1285,15 @@ func main() {
 			try("性能测试示例", performanceTestExample)
 		case "error":
 			try("错误处理示例", errorHandlingExample)
+		case "chain":
+			try("Chain编排示例", chainOrchestrationExample)
+		case "graph":
+			try("Graph编排示例", graphOrchestrationExample)
 		case "comparison":
 			try("策略对比示例", comparisonExample)
 		default:
 			fmt.Printf("未知示例: %s\n", exampleName)
-			fmt.Println("可用示例: basic, option, strategy, advanced, batch, performance, error, comparison")
+			fmt.Println("可用示例: basic, option, strategy, advanced, batch, performance, error, chain, graph, comparison")
 			return
 		}
 	} else {
@@ -905,6 +1305,8 @@ func main() {
 		try("批量处理示例", batchProcessingExample)
 		try("性能测试示例", performanceTestExample)
 		try("错误处理示例", errorHandlingExample)
+		try("Chain编排示例", chainOrchestrationExample)
+		try("Graph编排示例", graphOrchestrationExample)
 		try("策略对比示例", comparisonExample)
 	}
 
@@ -918,6 +1320,8 @@ func main() {
 	fmt.Println("  go run main.go batch        # 运行批量处理示例")
 	fmt.Println("  go run main.go performance  # 运行性能测试示例")
 	fmt.Println("  go run main.go error        # 运行错误处理示例")
+	fmt.Println("  go run main.go chain        # 运行Chain编排示例")
+	fmt.Println("  go run main.go graph        # 运行Graph编排示例")
 	fmt.Println("  go run main.go comparison   # 运行策略对比示例")
 }
 
