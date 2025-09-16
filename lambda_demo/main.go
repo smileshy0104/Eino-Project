@@ -69,20 +69,20 @@ func main() {
 }
 
 func runAllDemos(ctx context.Context) {
-	fmt.Println("📝 演示1: InvokableLambda - 基础用法")
-	basicInvokableDemo(ctx)
+	//fmt.Println("📝 演示1: InvokableLambda - 基础用法")
+	//basicInvokableDemo(ctx)
 
-	fmt.Println("\n🌊 演示2: StreamableLambda - 生成数据流")
-	streamableLambdaDemo(ctx)
+	//fmt.Println("\n🌊 演示2: StreamableLambda - 生成数据流")
+	//streamableLambdaDemo(ctx)
 
-	fmt.Println("\n📊 演示3: CollectableLambda - 收集数据流")
-	collectableLambdaDemo(ctx)
+	//fmt.Println("\n📊 演示3: CollectableLambda - 收集数据流")
+	//collectableLambdaDemo(ctx)
 
 	fmt.Println("\n⚡ 演示4: TransformableLambda - 流转换")
 	transformableLambdaDemo(ctx)
 
-	fmt.Println("\n🔗 演示5: Lambda链式组合")
-	lambdaChainDemo(ctx)
+	//fmt.Println("\n🔗 演示5: Lambda链式组合")
+	//lambdaChainDemo(ctx)
 
 	fmt.Println("\n✅ 所有真正的 Lambda 演示完成！")
 }
@@ -195,8 +195,18 @@ func streamableLambdaDemo(ctx context.Context) {
 
 // 3. CollectableLambda 演示 - 收集流式输入为单个输出
 func collectableLambdaDemo(ctx context.Context) {
-	// CollectableLambda: 接收流式输入，生成单个输出
-	collectWordsLambda := compose.CollectableLambda(func(ctx context.Context, input *schema.StreamReader[string]) (string, error) {
+	// 演示正确的 CollectableLambda 用法
+	// CollectableLambda 通常与 StreamableLambda 组合使用
+
+	// 步骤1: 创建 StreamableLambda 生成流
+	streamLambda := compose.StreamableLambda(func(ctx context.Context, input string) (*schema.StreamReader[string], error) {
+		words := strings.Fields(input)
+		fmt.Printf("  分割文本 '%s' 为 %d 个单词\n", input, len(words))
+		return schema.StreamReaderFromArray(words), nil
+	})
+
+	// 步骤2: 创建 CollectableLambda 收集流
+	collectLambda := compose.CollectableLambda(func(ctx context.Context, input *schema.StreamReader[string]) (string, error) {
 		var words []string
 		var totalChars int
 
@@ -223,23 +233,13 @@ func collectableLambdaDemo(ctx context.Context) {
 		return result, nil
 	})
 
-	// 创建测试流数据
-	testWords := []string{"Eino", "Lambda", "Components", "Demo"}
-	inputStream := schema.StreamReaderFromArray(testWords)
-
-	// 先创建一个传递 StreamReader 的 Lambda
-	passthroughLambda := compose.InvokableLambda(func(ctx context.Context, input *schema.StreamReader[string]) (*schema.StreamReader[string], error) {
-		fmt.Println("  传递 StreamReader 到 CollectableLambda")
-		return input, nil
-	})
-
-	// 使用 Graph 来执行完整流程
-	graph := compose.NewGraph[*schema.StreamReader[string], string]()
-	graph.AddLambdaNode("passthrough", passthroughLambda)
-	graph.AddLambdaNode("collect_lambda", collectWordsLambda)
-	graph.AddEdge(compose.START, "passthrough")
-	graph.AddEdge("passthrough", "collect_lambda")
-	graph.AddEdge("collect_lambda", compose.END)
+	// 使用 Graph 组合 StreamableLambda -> CollectableLambda
+	graph := compose.NewGraph[string, string]()
+	graph.AddLambdaNode("stream", streamLambda)
+	graph.AddLambdaNode("collect", collectLambda)
+	graph.AddEdge(compose.START, "stream")
+	graph.AddEdge("stream", "collect")
+	graph.AddEdge("collect", compose.END)
 
 	runnable, err := graph.Compile(ctx)
 	if err != nil {
@@ -247,9 +247,10 @@ func collectableLambdaDemo(ctx context.Context) {
 		return
 	}
 
-	fmt.Printf("  输入流: %v\n", testWords)
+	input := "Eino Lambda Components CollectableLambda Demo"
+	fmt.Printf("  输入: '%s'\n", input)
 
-	result, err := runnable.Invoke(ctx, inputStream)
+	result, err := runnable.Invoke(ctx, input)
 	if err != nil {
 		log.Printf("执行失败: %v", err)
 		return
