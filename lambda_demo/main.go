@@ -69,17 +69,17 @@ func main() {
 }
 
 func runAllDemos(ctx context.Context) {
-	//fmt.Println("📝 演示1: InvokableLambda - 基础用法")
-	//basicInvokableDemo(ctx)
+	fmt.Println("📝 演示1: InvokableLambda - 基础用法")
+	basicInvokableDemo(ctx)
 
-	//fmt.Println("\n🌊 演示2: StreamableLambda - 生成数据流")
-	//streamableLambdaDemo(ctx)
+	fmt.Println("\n🌊 演示2: StreamableLambda - 生成数据流")
+	streamableLambdaDemo(ctx)
 
-	//fmt.Println("\n📊 演示3: CollectableLambda - 收集数据流")
-	//collectableLambdaDemo(ctx)
+	fmt.Println("\n📊 演示3: CollectableLambda - 收集数据流")
+	collectableLambdaDemo(ctx)
 
-	//fmt.Println("\n⚡ 演示4: TransformableLambda - 流转换")
-	//transformableLambdaDemo(ctx)
+	fmt.Println("\n⚡ 演示4: TransformableLambda - 流转换")
+	transformableLambdaDemo(ctx)
 
 	fmt.Println("\n🔗 演示5: Lambda链式组合")
 	lambdaChainDemo(ctx)
