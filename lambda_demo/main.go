@@ -78,11 +78,11 @@ func runAllDemos(ctx context.Context) {
 	//fmt.Println("\n📊 演示3: CollectableLambda - 收集数据流")
 	//collectableLambdaDemo(ctx)
 
-	fmt.Println("\n⚡ 演示4: TransformableLambda - 流转换")
-	transformableLambdaDemo(ctx)
+	//fmt.Println("\n⚡ 演示4: TransformableLambda - 流转换")
+	//transformableLambdaDemo(ctx)
 
-	//fmt.Println("\n🔗 演示5: Lambda链式组合")
-	//lambdaChainDemo(ctx)
+	fmt.Println("\n🔗 演示5: Lambda链式组合")
+	lambdaChainDemo(ctx)
 
 	fmt.Println("\n✅ 所有真正的 Lambda 演示完成！")
 }
@@ -261,8 +261,18 @@ func collectableLambdaDemo(ctx context.Context) {
 
 // 4. TransformableLambda 演示 - 流到流的转换
 func transformableLambdaDemo(ctx context.Context) {
-	// TransformableLambda: 接收流式输入，生成流式输出
-	uppercaseTransformLambda := compose.TransformableLambda(func(ctx context.Context, input *schema.StreamReader[string]) (*schema.StreamReader[string], error) {
+	// 演示正确的 TransformableLambda 用法
+	// TransformableLambda 通常在 StreamableLambda 和 CollectableLambda 之间使用
+
+	// 步骤1: 创建 StreamableLambda 生成流
+	streamLambda := compose.StreamableLambda(func(ctx context.Context, input string) (*schema.StreamReader[string], error) {
+		words := strings.Fields(input)
+		fmt.Printf("  分割文本 '%s' 为 %d 个单词\n", input, len(words))
+		return schema.StreamReaderFromArray(words), nil
+	})
+
+	// 步骤2: 创建 TransformableLambda 转换流
+	transformLambda := compose.TransformableLambda(func(ctx context.Context, input *schema.StreamReader[string]) (*schema.StreamReader[string], error) {
 		fmt.Println("  开始流转换处理...")
 
 		// 创建输出流
@@ -300,15 +310,38 @@ func transformableLambdaDemo(ctx context.Context) {
 		return sr, nil
 	})
 
-	// 创建测试流数据
-	testWords := []string{"hello", "world", "eino", "lambda"}
-	inputStream := schema.StreamReaderFromArray(testWords)
+	// 步骤3: 创建 CollectableLambda 收集转换后的流
+	collectLambda := compose.CollectableLambda(func(ctx context.Context, input *schema.StreamReader[string]) (string, error) {
+		var results []string
 
-	// 使用 Graph 来执行 TransformableLambda
-	graph := compose.NewGraph[*schema.StreamReader[string], *schema.StreamReader[string]]()
-	graph.AddLambdaNode("transform_lambda", uppercaseTransformLambda)
-	graph.AddEdge(compose.START, "transform_lambda")
-	graph.AddEdge("transform_lambda", compose.END)
+		fmt.Println("  开始收集转换后的流...")
+		for {
+			result, err := input.Recv()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				return "", err
+			}
+
+			results = append(results, result)
+			fmt.Printf("    收集转换结果: %s\n", result)
+		}
+
+		finalResult := fmt.Sprintf("转换完成: [%s]", strings.Join(results, ", "))
+		fmt.Println("  收集完成")
+		return finalResult, nil
+	})
+
+	// 使用 Graph 组合完整流水线: StreamableLambda -> TransformableLambda -> CollectableLambda
+	graph := compose.NewGraph[string, string]()
+	graph.AddLambdaNode("stream", streamLambda)
+	graph.AddLambdaNode("transform", transformLambda)
+	graph.AddLambdaNode("collect", collectLambda)
+	graph.AddEdge(compose.START, "stream")
+	graph.AddEdge("stream", "transform")
+	graph.AddEdge("transform", "collect")
+	graph.AddEdge("collect", compose.END)
 
 	runnable, err := graph.Compile(ctx)
 	if err != nil {
@@ -316,27 +349,16 @@ func transformableLambdaDemo(ctx context.Context) {
 		return
 	}
 
-	fmt.Printf("  输入流: %v\n", testWords)
+	input := "hello world eino transformable lambda demo"
+	fmt.Printf("  输入: '%s'\n", input)
 
-	outputStream, err := runnable.Invoke(ctx, inputStream)
+	result, err := runnable.Invoke(ctx, input)
 	if err != nil {
 		log.Printf("执行失败: %v", err)
 		return
 	}
 
-	// 读取转换后的流
-	fmt.Println("  转换结果:")
-	for {
-		transformed, err := outputStream.Recv()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			log.Printf("读取输出流失败: %v", err)
-			break
-		}
-		fmt.Printf("    - %s\n", transformed)
-	}
+	fmt.Printf("  最终结果: %s\n", result)
 }
 
 // 5. Lambda 链式组合演示
@@ -373,22 +395,18 @@ func lambdaChainDemo(ctx context.Context) {
 		return result, nil
 	})
 
-	// 创建链 - 完整的流水线：string -> StreamReader[string] -> string
-	chain1 := compose.NewChain[string, *schema.StreamReader[string]]()
-	chain1.AppendLambda(textToStream)
+	// 使用单一 Graph 来创建完整的 Lambda 链
+	// Graph 更适合处理不同类型间的连接
+	graph := compose.NewGraph[string, string]()
+	graph.AddLambdaNode("text_to_stream", textToStream)
+	graph.AddLambdaNode("stream_to_result", streamToResult)
+	graph.AddEdge(compose.START, "text_to_stream")
+	graph.AddEdge("text_to_stream", "stream_to_result")
+	graph.AddEdge("stream_to_result", compose.END)
 
-	runnable1, err := chain1.Compile(ctx)
+	runnable, err := graph.Compile(ctx)
 	if err != nil {
-		log.Printf("编译第一链失败: %v", err)
-		return
-	}
-
-	chain2 := compose.NewChain[*schema.StreamReader[string], string]()
-	chain2.AppendLambda(streamToResult)
-
-	runnable2, err := chain2.Compile(ctx)
-	if err != nil {
-		log.Printf("编译第二链失败: %v", err)
+		log.Printf("编译 Lambda 链失败: %v", err)
 		return
 	}
 
@@ -396,17 +414,10 @@ func lambdaChainDemo(ctx context.Context) {
 	input := "Eino Lambda Chain Demonstration"
 	fmt.Printf("  输入: '%s'\n", input)
 
-	// 执行第一步
-	stream, err := runnable1.Invoke(ctx, input)
+	// 执行完整的 Lambda 链
+	finalResult, err := runnable.Invoke(ctx, input)
 	if err != nil {
-		log.Printf("第一步执行失败: %v", err)
-		return
-	}
-
-	// 执行第二步
-	finalResult, err := runnable2.Invoke(ctx, stream)
-	if err != nil {
-		log.Printf("第二步执行失败: %v", err)
+		log.Printf("Lambda 链执行失败: %v", err)
 		return
 	}
 
