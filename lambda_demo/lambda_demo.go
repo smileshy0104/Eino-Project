@@ -13,19 +13,19 @@ import (
 	"github.com/cloudwego/eino/compose"
 )
 
-// UserInput 用户输入结构
-type UserInput struct {
-	Name string `json:"name"`
-	Age  int    `json:"age"`
-	City string `json:"city"`
-}
-
-// ProcessedData 处理后的数据结构
-type ProcessedData struct {
-	UserInfo    string `json:"user_info"`
-	ProcessTime string `json:"process_time"`
-	Category    string `json:"category"`
-}
+//// UserInput 用户输入结构
+//type UserInput struct {
+//	Name string `json:"name"`
+//	Age  int    `json:"age"`
+//	City string `json:"city"`
+//}
+//
+//// ProcessedData 处理后的数据结构
+//type ProcessedData struct {
+//	UserInfo    string `json:"user_info"`
+//	ProcessTime string `json:"process_time"`
+//	Category    string `json:"category"`
+//}
 
 func main() {
 	fmt.Println("=== Eino Lambda 组件演示 ===")
@@ -52,7 +52,7 @@ func main() {
 }
 
 // 演示1: InvokableLambda 在 Chain 中的使用
-func runInvokableLambdaDemo(ctx context.Context) {
+func runInvokableLambdaDemo1(ctx context.Context) {
 	// 创建一个用户数据处理链
 	chain := compose.NewChain[UserInput, string]()
 
