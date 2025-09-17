@@ -254,15 +254,15 @@ func main() {
 }
 
 func runAllDemos(ctx context.Context) {
-	fmt.Println("📝 演示1: 基础文档加载")
-	basicLoaderDemo(ctx)
+	//fmt.Println("📝 演示1: 基础文档加载")
+	//basicLoaderDemo(ctx)
 
 	//fmt.Println("\n📚 演示2: 多文件批量加载")
 	//multiFileLoaderDemo(ctx)
-	//
-	//fmt.Println("\n🌐 演示3: 网络资源加载")
-	//urlLoaderDemo(ctx)
-	//
+
+	fmt.Println("\n🌐 演示3: 网络资源加载")
+	urlLoaderDemo(ctx)
+
 	//fmt.Println("\n🔗 演示4: 链式集成")
 	//chainIntegrationDemo(ctx)
 	//

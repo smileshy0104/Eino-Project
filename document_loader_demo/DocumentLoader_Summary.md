@@ -82,7 +82,7 @@ type Document struct {
 
 ### Source 接口
 
-`Source` 定义了数据源的抽象接口：
+`Source` 自定义了数据源的抽象接口：
 
 ```go
 type Source interface {
