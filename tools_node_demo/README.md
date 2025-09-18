@@ -2,6 +2,12 @@
 
 本文档是对 Eino 框架中 `ToolsNode` 组件的核心功能和使用方式的完整总结，结合官方文档和实际项目示例。
 
+> **🔔 重要说明**:
+> - 本演示项目专注于展示ToolsNode的**核心概念**和**工作原理**
+> - 所有工具实现都是**真实可运行**的，展示了完整的工具开发流程
+> - ✅ **新增真实API演示**: `realapi`、`simplechain`、`simplegraph` 演示使用了真实的 Eino API
+> - 传统演示采用**模拟方式**来展示关键思想，新增演示展示了实际的API集成方式
+
 ## 🚀 快速开始
 
 ### 配置环境
@@ -27,6 +33,12 @@ go build -o tools_node_demo main.go
 ./tools_node_demo chain         # 工具调用链演示
 ./tools_node_demo error         # 错误处理演示
 ./tools_node_demo performance   # 性能测试演示
+./tools_node_demo chainflow     # Chain集成演示
+./tools_node_demo graph         # Graph集成演示
+./tools_node_demo advanced      # 高级编排模式演示
+./tools_node_demo realapi       # 真实API集成演示 ⭐️ 新增
+./tools_node_demo simplechain   # 简化Chain演示 ⭐️ 新增
+./tools_node_demo simplegraph   # 简化Graph演示 ⭐️ 新增
 ```
 
 ### 配置文件
@@ -306,6 +318,77 @@ for i, expr := range testCases {
 - 并发性能对比
 - 资源使用情况
 
+### 7. 🔗 Chain 集成演示 (`chainflow`)
+
+**功能**: 展示工具在 Chain 编排中的完整集成流程
+
+> **📝 说明**: 此演示展示了Chain集成的概念和工作流程。
+> 由于Eino依赖的复杂性，演示代码采用模拟方式来展示核心思想。
+> 在实际项目中，需要根据具体的Eino版本和API进行调整。
+
+```go
+// Chain 工作流程演示（概念性）
+userQuery := "帮我计算 15 * 8 的结果，然后查询北京的天气"
+
+// Chain集成的核心理念：线性工作流
+// 1. LLM理解用户意图
+// 2. 自动选择合适的工具
+// 3. 按序执行工具调用
+// 4. 整合结果返回用户
+
+// 实际演示代码中的实现：
+// 通过顺序调用多个工具来模拟Chain的执行流程
+```
+
+**工作流特点**:
+- 顺序执行工具调用
+- LLM驱动的工具选择
+- 智能结果整合
+- 用户友好的交互体验
+
+### 8. 🕸️ Graph 集成演示 (`graph`)
+
+**功能**: 展示工具在 Graph 编排中的复杂工作流
+
+> **📝 说明**: 此演示展示了Graph集成的概念和并行执行特性。
+> 实际代码使用goroutine模拟了Graph的并行执行，展示了多个工具同时运行的核心思想。
+
+```go
+// Graph 拓扑结构（概念性）
+START -> [输入解析] -> [决策路由] -> [并行工具执行] -> [结果聚合] -> END
+                              |
+                              ├── [计算器工具]
+                              ├── [天气工具]
+                              └── [时间工具]
+
+// 实际演示代码中的实现：
+// 使用goroutine实现真正的并行工具调用
+// 通过channel收集并行执行的结果
+```
+
+**Graph 特点**:
+- 并行工具执行
+- 复杂的节点路由
+- 灵活的拓扑结构
+- 高效的资源利用
+
+### 9. 🚀 高级编排模式演示 (`advanced`)
+
+**功能**: 展示工具编排的高级模式和最佳实践
+```go
+// 高级编排模式
+1. 条件分支编排 - 根据输入类型选择工具
+2. 循环重试编排 - 失败时自动重试
+3. 错误恢复编排 - 主工具失败时使用备用工具
+4. 动态工具选择 - 运行时决定工具使用
+```
+
+**编排特点**:
+- 智能路由决策
+- 容错和恢复机制
+- 动态工具配置
+- 复杂业务逻辑支持
+
 ---
 
 ## ⚙️ 配置说明
@@ -363,6 +446,9 @@ tools_node_demo/
 | `toolChainDemo()` | 工具调用链演示 | 复杂工作流编排 |
 | `errorHandlingDemo()` | 错误处理演示 | 全面错误处理机制 |
 | `performanceTestDemo()` | 性能测试演示 | 性能监控和优化 |
+| `chainIntegrationDemo()` | Chain集成演示 | Chain编排工作流 |
+| `graphIntegrationDemo()` | Graph集成演示 | Graph并行执行 |
+| `advancedOrchestrationDemo()` | 高级编排模式演示 | 复杂编排模式 |
 
 ### 工具实现类型
 
