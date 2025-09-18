@@ -1,7 +1,5 @@
 # 🛠️ Eino ToolsNode 组件完全指南
 
-本文档是对 Eino 框架中 `ToolsNode` 组件的核心功能和使用方式的完整总结，结合官方文档和实际项目示例。
-
 ## 🚀 快速开始
 
 ### 🛠️ 配置文件
@@ -173,6 +171,7 @@ ParamsOneOf: &openapi3.Schema{
 使用 `utils.InferTool()` 从函数自动生成工具：
 
 ```go
+// TODO 这是**最简洁、最高效**的工具创建方式。`InferTool` 利用 Go 的反射机制，自动从业务函数的输入输出结构体中推断出工具的 schema。
 // 定义工具函数
 func SearchWeb(ctx context.Context, query string, limit int) (string, error) {
     // 搜索逻辑实现
@@ -180,7 +179,7 @@ func SearchWeb(ctx context.Context, query string, limit int) (string, error) {
     return formatResults(results), nil
 }
 
-// 自动创建工具
+// TODO 自动创建工具，将本地业务函数 `SearchWeb` 传递给 InferTool，InferTool 会自动生成工具的 schema 和 Info 方法。
 searchTool, err := utils.InferTool(
     "search_web",                    // 工具名称
     "在网络上搜索信息",               // 工具描述
@@ -191,6 +190,7 @@ searchTool, err := utils.InferTool(
 ### 2. 🔧 手动创建工具
 
 ```go
+// TODO 这是最原生、最灵活的方式，需要开发者手动为结构体实现 `InvokableTool` 接口中的 `Info()` 和 `InvokableRun()` 两个方法。
 // 实现 InvokableTool 接口
 type WeatherTool struct {
     apiKey string
@@ -221,7 +221,41 @@ func (w *WeatherTool) InvokableRun(ctx context.Context, input string, opts ...to
 }
 ```
 
-### 3. 🌊 流式工具创建
+### 3. 🔧 手动创建工具
+
+```go
+// TODO `utils.NewTool` 是一个辅助函数，它在手动定义元数据和业务逻辑函数之间取得了平衡。
+// 实现 InvokableTool 接口
+type WeatherTool struct {
+    apiKey string
+}
+
+func (w *WeatherTool) Info() *tool.ToolInfo {
+    return &tool.ToolInfo{
+        Name:        "get_weather",
+        Description: "获取指定城市的当前天气信息",
+        ParamsOneOf: map[string]*tool.ParameterInfo{
+            "city": {
+                Type:        "string",
+                Required:    true,
+                Description: "城市名称",
+            },
+        },
+    }
+}
+
+func (w *WeatherTool) InvokableRun(ctx context.Context, input string, opts ...tool.Option) (string, error) {
+    // 解析输入参数
+    params := parseInput(input)
+    city := params["city"]
+
+    // 调用天气API
+    weather := w.getWeatherData(city)
+    return formatWeatherInfo(weather), nil
+}
+```
+
+### 4. 🌊 流式工具创建
 
 ```go
 // 实现 StreamableTool 接口
